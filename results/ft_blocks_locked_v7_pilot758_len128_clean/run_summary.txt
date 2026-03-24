@@ -1,0 +1,49 @@
+FASTA broader block fine-tuning summary
+=======================================
+
+Run name: ft_blocks_locked_v7_pilot758_len128_clean
+Model: evo-1-8k-base
+Data path: viral_pilot_raw/data/viral_pilot_balanced_min8k.fasta
+Locked checkpoint: results/evo_lock_projections_v7/model_locked_projections.pt
+Target blocks: [0, 1, 2, 3, 4, 5, 6, 7]
+Device: cuda:0
+Train sequences: 682
+Val sequences: 76
+Train length range: 8384 - 30123
+Val length range: 8775 - 30120
+Train steps: 500
+Batch size: 1
+Seq len: 128
+Grad accum steps: 1
+Optimizer: adamw
+Learning rate: 1e-05
+Eval batches: 16
+Gradient checkpointing requested: True
+AMP dtype: torch.bfloat16
+
+Total params: 6,452,781,056
+Trainable params: 1,612,808,192 (24.99%)
+Targeted params: 1,612,808,192 (24.99%)
+Number of trainable parameter tensors selected: 112
+
+Total train nucleotides: 11,050,379
+Tokens seen in training: 64,000
+Approximate coverage ratio: 0.005792
+
+Best validation metrics
+-----------------------
+Best val loss step: 0
+Best val loss: 1.362246
+Best val ppl step: 0
+Best val ppl: 3.904954
+Best val acc step: 0
+Best val acc: 0.333661
+
+Final metrics
+-------------
+Final train loss: 1.411960
+Final train ppl: 4.103993
+Final train acc: 0.305610
+Final val loss: 1.415457
+Final val ppl: 4.118367
+Final val acc: 0.288878

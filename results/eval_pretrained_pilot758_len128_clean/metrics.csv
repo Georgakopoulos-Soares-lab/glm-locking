@@ -1,0 +1,3 @@
+split,loss,perplexity,next_token_acc,run_name
+train,1.3677440360188484,3.926482692756693,0.33366141468286514,eval_pretrained_pilot758_len128_clean
+val,1.3598320484161377,3.895538984907461,0.33661417476832867,eval_pretrained_pilot758_len128_clean

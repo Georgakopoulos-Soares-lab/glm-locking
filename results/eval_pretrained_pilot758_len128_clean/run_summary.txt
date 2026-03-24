@@ -1,0 +1,26 @@
+Pretrained Evo evaluation summary
+================================
+
+Run name: eval_pretrained_pilot758_len128_clean
+Model: evo-1-8k-base
+Data path: viral_pilot_raw/data/viral_pilot_balanced_min8k.fasta
+Device: cuda:0
+Train sequences: 682
+Val sequences: 76
+Train length range: 8384 - 30123
+Val length range: 8775 - 30120
+Seq len: 128
+Eval batches: 16
+Gradient checkpointing requested: True
+AMP dtype: torch.bfloat16
+
+Total params: 6,452,781,056
+Total train nucleotides: 11,050,379
+
+Train loss: 1.367744
+Train ppl: 3.926483
+Train acc: 0.333661
+
+Val loss: 1.359832
+Val ppl: 3.895539
+Val acc: 0.336614
