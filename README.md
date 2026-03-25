@@ -16,6 +16,9 @@ This repository contains a clean workspace for pilot experiments on weight locki
 - `Evo_viral_ft_blocks_locked.py`  
   Runs broader block-restricted fine-tuning on blocks 0-7 starting from the locked checkpoint.
 
+- `evo_lock_projections.py`  
+  Runs the spectral locking procedure on Hyena projection matrices and saves a locked checkpoint (e.g. `results/evo_lock_projections_v7/model_locked_projections.pt`), which is then used as initialization by `Evo_viral_ft_blocks_locked.py`.
+
 ## Result folders
 
 The `results/` directory contains the following runs:
