@@ -1,0 +1,36 @@
+# Credentials
+.env
+
+# Data
+*.fasta
+*.fna
+*.fa
+
+# Results & checkpoints
+results/
+*.pt
+*.pth
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+slurm-*.out
