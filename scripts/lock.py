@@ -2,9 +2,14 @@
 in target Hyena blocks while preserving model utility via a retain loss.
 
 Usage:
+    # Single GPU
     python scripts/lock.py
+
+    # Multi-GPU (torchrun handles LOCAL_RANK / WORLD_SIZE)
+    torchrun --nproc_per_node=4 scripts/lock.py
 """
 
+import contextlib
 import os
 import sys
 
@@ -12,6 +17,8 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import math
 import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -60,14 +67,14 @@ CONFIG = LockConfig(
     alpha_start=0.8,
     alpha_end=0.3,
     top_k=1,
-    batch_size=1,
-    seq_len=512,
-    grad_accum_steps=4,
+    batch_size=4,       # A100 40 GB: 6.4B model (~13 GB bf16) + activations; 4 is safe at seq_len=1024
+    seq_len=1024,
+    grad_accum_steps=1,
     val_every=25,
     val_batches=8,
     max_grad_norm=1.0,
 
-    target_blocks=set(range(8)),
+    target_blocks=set(range(32)),
     target_layer_patterns=(
         ".projections.weight",
         ".out_filter_dense.weight",
@@ -81,24 +88,86 @@ CONFIG = LockConfig(
 
 
 # ===========================================================================
+# Distributed helpers
+# ===========================================================================
+
+def _maybe_relaunch_torchrun():
+    """If not already under torchrun and multiple GPUs are visible, re-exec via torchrun.
+
+    This lets you run `python scripts/lock.py` and automatically get DDP on all
+    available GPUs without remembering to use torchrun manually.
+    """
+    if "LOCAL_RANK" in os.environ:
+        return  # Already launched by torchrun — nothing to do
+
+    import subprocess
+    n = torch.cuda.device_count()
+    if n <= 1:
+        return  # Single GPU or no GPU — run normally
+
+    print(f"[auto-launch] {n} GPUs detected. Re-launching with torchrun --nproc_per_node={n}")
+    cmd = [
+        "torchrun",
+        f"--nproc_per_node={n}",
+        "--standalone",
+    ] + sys.argv  # sys.argv[0] is this script
+    sys.exit(subprocess.call(cmd))
+
+
+def _setup_dist():
+    """Initialize torch.distributed if LOCAL_RANK is set (torchrun / srun).
+
+    Returns:
+        rank (int)       – global rank; 0 for non-distributed runs
+        world_size (int) – total number of processes; 1 for non-distributed
+        local_rank (int) – GPU index on this node; 0 for non-distributed
+        is_ddp (bool)    – True when running under DDP
+    """
+    if "LOCAL_RANK" not in os.environ:
+        return 0, 1, 0, False
+
+    local_rank = int(os.environ["LOCAL_RANK"])
+    dist.init_process_group(backend="nccl")
+    rank = dist.get_rank()
+    world_size = dist.get_world_size()
+    torch.cuda.set_device(local_rank)
+    return rank, world_size, local_rank, True
+
+
+# ===========================================================================
 # Main
 # ===========================================================================
 def main():
+    # Auto-relaunch via torchrun if multiple GPUs are available and we weren't
+    # already started by torchrun. No-op if LOCAL_RANK is already set.
+    _maybe_relaunch_torchrun()
+
+    # --- Distributed setup (no-op on single GPU) ---
+    rank, world_size, local_rank, is_ddp = _setup_dist()
+    is_rank0 = (rank == 0)
+
     cfg = CONFIG
-    os.makedirs(cfg.results_dir, exist_ok=True)
-    set_seed(cfg.seed)
+    if is_ddp:
+        # Each rank uses its own GPU; override the device string from config
+        cfg.device = f"cuda:{local_rank}"
+
+    if is_rank0:
+        os.makedirs(cfg.results_dir, exist_ok=True)
+    set_seed(cfg.seed + rank)   # different seed per rank → different data samples
     amp_dtype, use_scaler = get_amp_settings()
 
     # --- Data ---
-    print("Loading retain data...")
+    if is_rank0:
+        print("Loading retain data...")
     sequences = load_sequences(cfg.retain_data_path, cfg.min_seq_len)
     train_seqs, val_seqs = split_sequences(sequences, cfg.train_fraction)
-    print(f"  {len(sequences)} sequences -> {len(train_seqs)} train / {len(val_seqs)} val")
+    if is_rank0:
+        print(f"  {len(sequences)} sequences -> {len(train_seqs)} train / {len(val_seqs)} val")
 
     # --- Model ---
     model, tokenizer = load_evo_model(cfg.model_name, cfg.device)
 
-    # --- Targets ---
+    # --- Targets (before DDP wrapping so we get the real param tensors) ---
     target_names, target_params = get_lock_targets(
         model, cfg.target_blocks, cfg.target_layer_patterns
     )
@@ -108,25 +177,34 @@ def main():
     target_names_set = set(target_names)
     freeze_all_except(model, target_names_set)
 
-    total = count_params(model)
-    trainable = count_trainable(model)
-    print(f"Total params:     {total:,}")
-    print(f"Trainable params: {trainable:,} ({100 * trainable / total:.2f}%)")
-    print(f"Target matrices:  {len(target_params)}")
-    for n in target_names:
-        print(f"  {n}")
+    if is_rank0:
+        total = count_params(model)
+        trainable = count_trainable(model)
+        print(f"Total params:     {total:,}")
+        print(f"Trainable params: {trainable:,} ({100 * trainable / total:.2f}%)")
+        print(f"Target matrices:  {len(target_params)}")
+        for n in target_names:
+            print(f"  {n}")
+    else:
+        total = count_params(model)
+        trainable = count_trainable(model)
 
-    # --- SVD baseline (before locking) ---
-    svd_csv = os.path.join(cfg.results_dir, "svd_stats.csv")
-    pre_stats = compute_svd_stats(target_names, target_params, top_k=max(cfg.top_k, 3))
-    log_svd_stats(pre_stats, "before_locking", svd_csv)
-    print("\nSVD stats BEFORE locking:")
-    for s in pre_stats:
-        print(f"  {s['name']:60s}  σ1={s['sigma_1']:.4f}  σ2={s['sigma_2']:.4f}  κ={s['condition_number']:.1f}")
+    # --- Wrap with DDP after selecting targets ---
+    if is_ddp:
+        model = DDP(model, device_ids=[local_rank])
 
-    # --- Optimizer ---
+    # --- SVD baseline (before locking) — rank 0 only ---
+    if is_rank0:
+        svd_csv = os.path.join(cfg.results_dir, "svd_stats.csv")
+        pre_stats = compute_svd_stats(target_names, target_params, top_k=max(cfg.top_k, 3))
+        log_svd_stats(pre_stats, "before_locking", svd_csv)
+        print("\nSVD stats BEFORE locking:")
+        for s in pre_stats:
+            print(f"  {s['name']:60s}  σ1={s['sigma_1']:.4f}  σ2={s['sigma_2']:.4f}  κ={s['condition_number']:.1f}")
+
+    # --- Optimizer (on the trainable params of the raw model, pre-DDP refs still valid) ---
     optimizer = torch.optim.AdamW(
-        [p for p in model.parameters() if p.requires_grad],
+        [p for p in target_params if p.requires_grad],
         lr=cfg.lock_lr,
         betas=(0.9, 0.999),
         weight_decay=0.0,
@@ -137,62 +215,94 @@ def main():
     history = []
     optimizer.zero_grad(set_to_none=True)
 
-    print(f"\nStarting SpecDef locking for {cfg.lock_steps} steps...")
-    print(f"  alpha: {cfg.alpha_start} -> {cfg.alpha_end} (linear)")
-    print(f"  top_k={cfg.top_k}, lr={cfg.lock_lr}, seq_len={cfg.seq_len}")
-    print(f"  grad_accum={cfg.grad_accum_steps}, effective_batch={cfg.batch_size * cfg.grad_accum_steps}")
+    if is_rank0:
+        print(f"\nStarting SpecDef locking for {cfg.lock_steps} steps...")
+        print(f"  alpha: {cfg.alpha_start} -> {cfg.alpha_end} (linear)")
+        print(f"  top_k={cfg.top_k}, lr={cfg.lock_lr}, seq_len={cfg.seq_len}")
+        print(f"  grad_accum={cfg.grad_accum_steps}, effective_batch={cfg.batch_size * cfg.grad_accum_steps * world_size}")
 
-    for step in tqdm(range(cfg.lock_steps)):
+    # Helper: suppress DDP gradient sync for gradient accumulation (no-op on single GPU)
+    no_sync = model.no_sync if is_ddp else contextlib.nullcontext
+
+    for step in tqdm(range(cfg.lock_steps), disable=not is_rank0):
         model.train()
         alpha = get_alpha(step, cfg.lock_steps, cfg.alpha_start, cfg.alpha_end)
 
-        # Spectral term — weights are constant across accum steps, compute once
+        # ------------------------------------------------------------------
+        # Spectral term — depends only on weights (same on all ranks).
+        # We backward through it once, inside no_sync(), so that DDP does NOT
+        # fire an all_reduce for these gradients.  The gradients are identical
+        # on every rank, so averaging them would give the same value — but
+        # we prevent the communication overhead and the complication of DDP
+        # expecting a matching all_reduce at the end of the retain loop.
+        # Instead we scale the grad by 1/world_size manually when in DDP mode
+        # so that the effective magnitude matches the averaged retain grad.
+        # ------------------------------------------------------------------
         spec_term = spectral_term_topk(target_params, top_k=cfg.top_k)
+        spec_contribution = -(1.0 - alpha) * spec_term
+        if is_ddp:
+            spec_contribution = spec_contribution / world_size  # match DDP's average reduction
 
-        # Gradient accumulation
-        for _ in range(cfg.grad_accum_steps):
-            batch = build_batch(tokenizer, train_seqs, cfg.batch_size, cfg.seq_len, cfg.device)
-            with torch.autocast(device_type="cuda", dtype=amp_dtype):
-                logits, _ = model(batch)
-                retain_loss = causal_lm_loss(logits, batch) / cfg.grad_accum_steps
+        retain_loss_scalar = 0.0  # accumulated for logging
 
-            lock_loss = alpha * retain_loss - (1.0 - alpha) * spec_term / cfg.grad_accum_steps
-
+        with no_sync():
+            # Spec backward: no DDP sync
             if use_scaler:
-                scaler.scale(lock_loss).backward()
+                scaler.scale(spec_contribution).backward()
             else:
-                lock_loss.backward()
+                spec_contribution.backward()
 
+            # All retain accum steps except the last stay inside no_sync
+            for accum_i in range(cfg.grad_accum_steps - 1):
+                batch = build_batch(tokenizer, train_seqs, cfg.batch_size, cfg.seq_len, cfg.device)
+                with torch.autocast(device_type="cuda", dtype=amp_dtype):
+                    logits, _ = model(batch)
+                    retain_loss = causal_lm_loss(logits, batch) / cfg.grad_accum_steps
+                retain_loss_scalar += retain_loss.detach().float().item()
+                if use_scaler:
+                    scaler.scale(alpha * retain_loss).backward()
+                else:
+                    (alpha * retain_loss).backward()
+
+        # Last retain step — exits no_sync, triggers DDP all_reduce for accumulated grads
+        batch = build_batch(tokenizer, train_seqs, cfg.batch_size, cfg.seq_len, cfg.device)
+        with torch.autocast(device_type="cuda", dtype=amp_dtype):
+            logits, _ = model(batch)
+            retain_loss = causal_lm_loss(logits, batch) / cfg.grad_accum_steps
+        retain_loss_scalar += retain_loss.detach().float().item()
+        if use_scaler:
+            scaler.scale(alpha * retain_loss).backward()
+        else:
+            (alpha * retain_loss).backward()
+
+        # --- Optimizer step ---
         if use_scaler:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(
-                [p for p in model.parameters() if p.requires_grad], cfg.max_grad_norm
-            )
+            torch.nn.utils.clip_grad_norm_(target_params, cfg.max_grad_norm)
             scaler.step(optimizer)
             scaler.update()
         else:
-            torch.nn.utils.clip_grad_norm_(
-                [p for p in model.parameters() if p.requires_grad], cfg.max_grad_norm
-            )
+            torch.nn.utils.clip_grad_norm_(target_params, cfg.max_grad_norm)
             optimizer.step()
 
         optimizer.zero_grad(set_to_none=True)
 
-        # --- Logging ---
-        if step % cfg.val_every == 0 or step == cfg.lock_steps - 1:
+        # --- Logging (rank 0 only) ---
+        if is_rank0 and (step % cfg.val_every == 0 or step == cfg.lock_steps - 1):
+            # evaluate() uses the raw DDP-wrapped model; .eval() works on both
+            raw_model = model.module if is_ddp else model
             val_loss, val_ppl, val_acc = evaluate(
-                model, tokenizer, val_seqs, cfg.device,
+                raw_model, tokenizer, val_seqs, cfg.device,
                 cfg.val_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
             )
 
-            # Recompute spectral term for logging (detached)
             with torch.no_grad():
                 spec_log = spectral_term_topk(target_params, cfg.top_k).item()
 
             record = {
                 "step": step,
                 "alpha": round(alpha, 4),
-                "retain_loss": round(retain_loss.detach().float().item() * cfg.grad_accum_steps, 4),
+                "retain_loss": round(retain_loss_scalar * cfg.grad_accum_steps, 4),
                 "spectral_term": round(spec_log, 4),
                 "val_retain_loss": round(val_loss, 4),
                 "val_retain_ppl": round(val_ppl, 4),
@@ -207,30 +317,35 @@ def main():
                 f"val_acc={record['val_retain_acc']:.4f}"
             )
 
-    # --- SVD after locking ---
-    post_stats = compute_svd_stats(target_names, target_params, top_k=max(cfg.top_k, 3))
-    log_svd_stats(post_stats, "after_locking", svd_csv)
-    print("\nSVD stats AFTER locking:")
-    for s in post_stats:
-        print(f"  {s['name']:60s}  σ1={s['sigma_1']:.4f}  σ2={s['sigma_2']:.4f}  κ={s['condition_number']:.1f}")
+    # --- SVD after locking (rank 0 only) ---
+    if is_rank0:
+        post_stats = compute_svd_stats(target_names, target_params, top_k=max(cfg.top_k, 3))
+        log_svd_stats(post_stats, "after_locking", svd_csv)
+        print("\nSVD stats AFTER locking:")
+        for s in post_stats:
+            print(f"  {s['name']:60s}  σ1={s['sigma_1']:.4f}  σ2={s['sigma_2']:.4f}  κ={s['condition_number']:.1f}")
 
-    # --- Print inflation summary ---
-    print("\nSpectral inflation summary:")
-    for pre, post in zip(pre_stats, post_stats):
-        ratio = post["sigma_1"] / pre["sigma_1"] if pre["sigma_1"] > 0 else float("inf")
-        print(f"  {pre['name']:60s}  σ1: {pre['sigma_1']:.4f} -> {post['sigma_1']:.4f}  ({ratio:.2f}x)")
+    # --- Print inflation summary + Save (rank 0 only) ---
+    if is_rank0:
+        print("\nSpectral inflation summary:")
+        for pre, post in zip(pre_stats, post_stats):
+            ratio = post["sigma_1"] / pre["sigma_1"] if pre["sigma_1"] > 0 else float("inf")
+            print(f"  {pre['name']:60s}  σ1: {pre['sigma_1']:.4f} -> {post['sigma_1']:.4f}  ({ratio:.2f}x)")
 
-    # --- Save ---
-    save_history_csv(history, os.path.join(cfg.results_dir, "lock_metrics.csv"))
-    _save_plot(history, os.path.join(cfg.results_dir, "lock_curve.png"))
-    _save_summary(cfg, total, trainable, target_names, history, pre_stats, post_stats)
+        save_history_csv(history, os.path.join(cfg.results_dir, "lock_metrics.csv"))
+        _save_plot(history, os.path.join(cfg.results_dir, "lock_curve.png"))
+        _save_summary(cfg, total, trainable, target_names, history, pre_stats, post_stats)
 
-    if cfg.save_checkpoint:
-        ckpt_path = os.path.join(cfg.results_dir, "model_locked.pt")
-        torch.save(model.state_dict(), ckpt_path)
-        print(f"Saved locked checkpoint: {ckpt_path}")
+        if cfg.save_checkpoint:
+            raw_model = model.module if is_ddp else model
+            ckpt_path = os.path.join(cfg.results_dir, "model_locked.pt")
+            torch.save(raw_model.state_dict(), ckpt_path)
+            print(f"Saved locked checkpoint: {ckpt_path}")
 
-    print("Done.")
+    if is_rank0:
+        print("Done.")
+    if is_ddp:
+        dist.destroy_process_group()
 
 
 # ===========================================================================
