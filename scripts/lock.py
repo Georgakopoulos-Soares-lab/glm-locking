@@ -15,6 +15,8 @@ import sys
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
+from transformers.optimization import Adafactor
+
 import math
 import torch
 import torch.distributed as dist
@@ -40,8 +42,10 @@ from src.utils import (
     compute_svd_stats,
     log_svd_stats,
     spectral_term_topk,
+    add_spectral_grad_inplace,
     get_alpha,
     load_evo_model,
+    maybe_enable_gradient_checkpointing,
     save_history_csv,
     count_params,
     count_trainable,
@@ -67,8 +71,8 @@ CONFIG = LockConfig(
     alpha_start=0.8,
     alpha_end=0.3,
     top_k=1,
-    batch_size=4,       # A100 40 GB: 6.4B model (~13 GB bf16) + activations; 4 is safe at seq_len=1024
-    seq_len=1024,
+    batch_size=2,       # gradient checkpointing frees activation memory; 2 is safe on A100 40GB
+    seq_len=512,
     grad_accum_steps=1,
     val_every=25,
     val_batches=8,
@@ -84,6 +88,7 @@ CONFIG = LockConfig(
     ),
 
     save_checkpoint=True,
+    use_gradient_checkpointing=True,
 )
 
 
@@ -166,6 +171,7 @@ def main():
 
     # --- Model ---
     model, tokenizer = load_evo_model(cfg.model_name, cfg.device)
+    maybe_enable_gradient_checkpointing(model, cfg.use_gradient_checkpointing)
 
     # --- Targets (before DDP wrapping so we get the real param tensors) ---
     target_names, target_params = get_lock_targets(
@@ -201,12 +207,20 @@ def main():
         print("\nSVD stats BEFORE locking:")
         for s in pre_stats:
             print(f"  {s['name']:60s}  σ1={s['sigma_1']:.4f}  σ2={s['sigma_2']:.4f}  κ={s['condition_number']:.1f}")
+    if is_ddp:
+        dist.barrier()  # all ranks wait for rank 0 to finish SVD stats before training starts
 
     # --- Optimizer (on the trainable params of the raw model, pre-DDP refs still valid) ---
-    optimizer = torch.optim.AdamW(
-        [p for p in target_params if p.requires_grad],
+    # AdamW would need 23 GiB of optimizer state for 154 bf16 matrices — doesn't fit on 40 GB GPU
+    # alongside the 38 GB model.  Adafactor stores only row+col vectors (O(n+m) per matrix),
+    # reducing total optimizer state from ~23 GiB to ~3 MB.
+    trainable_param_list = [p for p in target_params if p.requires_grad]
+    optimizer = Adafactor(
+        trainable_param_list,
         lr=cfg.lock_lr,
-        betas=(0.9, 0.999),
+        scale_parameter=False,   # use explicit lr, not rms(param)-scaled lr
+        relative_step=False,     # use fixed lr provided above
+        clip_threshold=1.0,      # Adafactor's internal RMS gradient clipping
         weight_decay=0.0,
     )
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
@@ -229,29 +243,22 @@ def main():
         alpha = get_alpha(step, cfg.lock_steps, cfg.alpha_start, cfg.alpha_end)
 
         # ------------------------------------------------------------------
-        # Spectral term — depends only on weights (same on all ranks).
-        # We backward through it once, inside no_sync(), so that DDP does NOT
-        # fire an all_reduce for these gradients.  The gradients are identical
-        # on every rank, so averaging them would give the same value — but
-        # we prevent the communication overhead and the complication of DDP
-        # expecting a matching all_reduce at the end of the retain loop.
-        # Instead we scale the grad by 1/world_size manually when in DDP mode
-        # so that the effective magnitude matches the averaged retain grad.
+        # Spectral gradient — analytical, GPU sequential, no autograd:
+        # d(spec_loss)/d(A_i) = -(1-alpha) / N / k * U[:,:k] @ V[:,:k].T
+        # where spec_loss = -(1-alpha) * mean_i(mean_topk_SV(A_i))
+        #
+        # DDP: since spec_grad is identical on every rank, DDP's gradient
+        # all_reduce (averaging) leaves it unchanged — no need to divide by
+        # world_size.  This also fixes a bug where the old code made the
+        # spectral term world_size× too weak in multi-GPU mode.
         # ------------------------------------------------------------------
-        spec_term = spectral_term_topk(target_params, top_k=cfg.top_k)
-        spec_contribution = -(1.0 - alpha) * spec_term
-        if is_ddp:
-            spec_contribution = spec_contribution / world_size  # match DDP's average reduction
+        spec_sv_mean = add_spectral_grad_inplace(
+            target_params, top_k=cfg.top_k, spec_loss_coeff=-(1.0 - alpha)
+        )
 
         retain_loss_scalar = 0.0  # accumulated for logging
 
         with no_sync():
-            # Spec backward: no DDP sync
-            if use_scaler:
-                scaler.scale(spec_contribution).backward()
-            else:
-                spec_contribution.backward()
-
             # All retain accum steps except the last stay inside no_sync
             for accum_i in range(cfg.grad_accum_steps - 1):
                 batch = build_batch(tokenizer, train_seqs, cfg.batch_size, cfg.seq_len, cfg.device)

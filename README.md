@@ -128,7 +128,7 @@ sbatch --gres=gpu:3 scripts/run_lock_slurm.sh   # 3-GPU DDP
 The locking procedure:
 
 - Loads `data/retain.fasta` (bacteria/archaea/phage, not task-specific)
-- Targets all `nn.Linear` weights in all 32 Hyena blocks (160 matrices):
+- Targets all `nn.Linear` weights in all 32 Hyena blocks (154 matrices):
   - `projections.weight` — input projections
   - `out_filter_dense.weight` — output dense
   - `mlp.l1.weight`, `mlp.l2.weight`, `mlp.l3.weight` — SwiGLU MLP
@@ -146,8 +146,8 @@ Current config (`scripts/lock.py`):
 | `lock_lr` | 5e-5 |
 | `alpha_start / alpha_end` | 0.8 → 0.3 |
 | `top_k` | 1 |
-| `batch_size` | 4 (per GPU) |
-| `seq_len` | 1024 |
+| `batch_size` | 2 (per GPU) |
+| `seq_len` | 512 |
 | `grad_accum_steps` | 1 |
 | `target_blocks` | all 32 |
 
@@ -177,11 +177,11 @@ Evo-1-8k-base is a StripedHyena model:
 
 | Aspect | v7 | Current |
 |--------|----|---------| 
-| Lock targets | `projections.weight` only (8 matrices) | All `nn.Linear` in all 32 blocks (160 matrices) |
+| Lock targets | `projections.weight` only (8 matrices) | All `nn.Linear` in all 32 blocks (154 matrices) |
 | Spectral aggregation | `.sum()` | `.mean()` (scale-stable) |
 | Lock steps | 50 | 500 |
-| Seq len (lock) | 64 | 1024 |
-| Seq len (fine-tune) | 128 | 1024 |
+| Seq len (lock) | 64 | 512 |
+| Seq len (fine-tune) | 128 | 512 |
 | SVD method | Full `svdvals` on GPU | Randomized `svd_lowrank` on GPU (no OOM, 50× faster) |
 | Gradient accumulation | None | Supported (default 1) |
 | Alpha schedule | Fixed 0.5 | Linear 0.8 → 0.3 |
