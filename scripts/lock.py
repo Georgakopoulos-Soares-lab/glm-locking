@@ -56,8 +56,8 @@ from src.utils import (
 # Config — edit here or override via a config file
 # ===========================================================================
 CONFIG = LockConfig(
-    run_name="lock_v8_all_linear",
-    results_dir="results/lock_v8_all_linear",
+    run_name="lock_v9_topk4",
+    results_dir="results/lock_v9_topk4",
 
     retain_data_path="data/retain.fasta",
     model_name="evo-1-8k-base",
@@ -66,15 +66,15 @@ CONFIG = LockConfig(
     train_fraction=0.9,
     min_seq_len=512,
 
-    lock_steps=500,
+    lock_steps=1000,
     lock_lr=5e-5,
     alpha_start=0.8,
     alpha_end=0.3,
-    top_k=1,
+    top_k=4,
     batch_size=2,       # gradient checkpointing frees activation memory; 2 is safe on A100 40GB
     seq_len=512,
     grad_accum_steps=1,
-    val_every=25,
+    val_every=50,
     val_batches=8,
     max_grad_norm=1.0,
 
