@@ -42,8 +42,8 @@ from src.utils import (
 # Config — edit or swap between locked/unlocked runs
 # ===========================================================================
 CONFIG = FinetuneConfig(
-    run_name="ft_attack_locked_v8",
-    results_dir="results/ft_attack_locked_v8",
+    run_name="ft_attack_unlocked_v8",
+    results_dir="results/ft_attack_unlocked_v8",
 
     data_path="data/attack.fasta",
     model_name="evo-1-8k-base",
@@ -52,18 +52,18 @@ CONFIG = FinetuneConfig(
     train_fraction=0.9,
     min_seq_len=512,
 
-    train_steps=5000,
+    train_steps=500,
     lr=1e-5,
     batch_size=1,
-    seq_len=1024,
-    grad_accum_steps=4,
-    val_every=100,
-    eval_batches=16,
+    seq_len=512,
+    grad_accum_steps=1,
+    val_every=50,
+    eval_batches=8,
     max_grad_norm=1.0,
     optimizer_name="adamw",
 
     target_blocks=set(range(8)),
-    locked_ckpt="results/lock_v8_all_linear/model_locked.pt",
+    locked_ckpt=None,
 
     save_checkpoint=True,
     use_gradient_checkpointing=True,
