@@ -12,11 +12,11 @@
 #SBATCH -J evo_lock
 #SBATCH -o logs/evo_lock.%j.out
 #SBATCH -e logs/evo_lock.%j.err
-#SBATCH -p gpu-a100-dev
+#SBATCH -p h100
 #SBATCH -N 1
-#SBATCH --mem=40G
-#SBATCH -t 2:00:00
-#SBATCH -A BCS25073
+#SBATCH --mem=200G
+#SBATCH -t 12:00:00
+#SBATCH -A BCS25105
 
 module purge
 unset LD_PRELOAD

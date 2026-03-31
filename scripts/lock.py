@@ -53,7 +53,7 @@ from src.utils import (
 )
 
 # ===========================================================================
-# Config — edit here or override via a config file
+# Config — defaults used when no --config file is passed
 # ===========================================================================
 CONFIG = LockConfig(
     run_name="lock_v9_topk4",
@@ -66,13 +66,13 @@ CONFIG = LockConfig(
     train_fraction=0.9,
     min_seq_len=512,
 
-    lock_steps=1000,
+    lock_steps=5000,
     lock_lr=5e-5,
     alpha_start=0.8,
     alpha_end=0.3,
-    top_k=4,
-    batch_size=2,       # gradient checkpointing frees activation memory; 2 is safe on A100 40GB
-    seq_len=512,
+    top_k=5,
+    batch_size=8,       # gradient checkpointing frees activation memory; 2 is safe on A100 40GB
+    seq_len=1024,
     grad_accum_steps=1,
     val_every=50,
     val_batches=8,
@@ -142,6 +142,25 @@ def _setup_dist():
 # ===========================================================================
 # Main
 # ===========================================================================
+def _load_config(path: str) -> LockConfig:
+    """Load a LockConfig from a YAML file."""
+    import yaml
+    with open(path) as f:
+        d = yaml.safe_load(f)
+    # Auto-derive results_dir from run_name — keeps configs DRY
+    d.setdefault("results_dir", f"results/{d['run_name']}")
+    if "target_blocks" in d:
+        val = d["target_blocks"]
+        d["target_blocks"] = set(range(val)) if isinstance(val, int) else set(val)
+    if "target_layer_patterns" in d:
+        d["target_layer_patterns"] = tuple(d["target_layer_patterns"])
+    # YAML loads scientific notation as string (e.g. '5e-5') — cast to float
+    for key in ("lock_lr", "lr"):
+        if key in d:
+            d[key] = float(d[key])
+    return LockConfig(**d)
+
+
 def main():
     # Auto-relaunch via torchrun if multiple GPUs are available and we weren't
     # already started by torchrun. No-op if LOCAL_RANK is already set.
@@ -151,7 +170,11 @@ def main():
     rank, world_size, local_rank, is_ddp = _setup_dist()
     is_rank0 = (rank == 0)
 
-    cfg = CONFIG
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default=None, help="Path to TOML config file")
+    args, _ = parser.parse_known_args()
+    cfg = _load_config(args.config) if args.config else CONFIG
     if is_ddp:
         # Each rank uses its own GPU; override the device string from config
         cfg.device = f"cuda:{local_rank}"

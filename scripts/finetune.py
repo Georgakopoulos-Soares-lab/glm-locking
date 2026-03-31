@@ -39,7 +39,7 @@ from src.utils import (
 )
 
 # ===========================================================================
-# Config — edit or swap between locked/unlocked runs
+# Config — defaults used when no --config file is passed
 # ===========================================================================
 CONFIG = FinetuneConfig(
     run_name="ft_attack_locked_v9",
@@ -50,19 +50,19 @@ CONFIG = FinetuneConfig(
     device="cuda:0",
     seed=42,
     train_fraction=0.9,
-    min_seq_len=512,
+    min_seq_len=1024,
 
-    train_steps=5000,
+    train_steps=16800,   # 20 epochs over 13 train sequences × 859k bases / seq_len=1024
     lr=5e-5,
     batch_size=1,
-    seq_len=512,
+    seq_len=1024,
     grad_accum_steps=1,
-    val_every=200,
+    val_every=500,
     eval_batches=8,
     max_grad_norm=1.0,
     optimizer_name="adamw",
 
-    target_blocks=set(range(8)),
+    target_blocks=set(range(32)),
     locked_ckpt="results/lock_v9_topk4/model_locked.pt",
 
     save_checkpoint=True,
@@ -70,8 +70,31 @@ CONFIG = FinetuneConfig(
 )
 
 
+def _load_config(path: str) -> FinetuneConfig:
+    """Load a FinetuneConfig from a YAML file."""
+    import yaml
+    with open(path) as f:
+        d = yaml.safe_load(f)
+    # Auto-derive results_dir from run_name — keeps configs DRY
+    d.setdefault("results_dir", f"results/{d['run_name']}")
+    if "target_blocks" in d:
+        val = d["target_blocks"]
+        d["target_blocks"] = set(range(val)) if isinstance(val, int) else set(val)
+    # locked_ckpt absent in YAML → None (unlocked baseline)
+    d.setdefault("locked_ckpt", None)
+    # YAML loads scientific notation as string (e.g. '5e-5') — cast to float
+    if "lr" in d:
+        d["lr"] = float(d["lr"])
+    return FinetuneConfig(**d)
+
+
 def main():
-    cfg = CONFIG
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default=None, help="Path to TOML config file")
+    args, _ = parser.parse_known_args()
+    cfg = _load_config(args.config) if args.config else CONFIG
+
     os.makedirs(cfg.results_dir, exist_ok=True)
     set_seed(cfg.seed)
     amp_dtype, use_scaler = get_amp_settings()
