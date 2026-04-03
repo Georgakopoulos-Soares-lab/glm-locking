@@ -24,7 +24,7 @@ max_grad_norm: 1.0
 optimizer_name: adamw
 
 # target_blocks: integer N → set(range(N))
-target_blocks: 8
+target_blocks: 32
 # locked_ckpt omitted → None (unlocked baseline)
 
 save_checkpoint: true

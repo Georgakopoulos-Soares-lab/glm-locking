@@ -1,7 +1,5 @@
-# Credentials
-.env
-
-
+# Data
+data/
 *.fasta
 *.fna
 *.fa

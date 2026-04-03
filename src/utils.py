@@ -49,7 +49,6 @@ class LockConfig:
     )
 
     save_checkpoint: bool = True
-    use_gradient_checkpointing: bool = True
 
 
 @dataclass
@@ -115,6 +114,46 @@ def get_amp_settings():
     if torch.cuda.is_bf16_supported():
         return torch.bfloat16, False
     return torch.float16, True
+
+
+# ---------------------------------------------------------------------------
+# DDP (Distributed Data Parallel)
+# ---------------------------------------------------------------------------
+
+def setup_ddp() -> tuple[int, int, int]:
+    """Initialize DDP if launched via torchrun.
+
+    Returns (rank, local_rank, world_size).
+    Single-GPU fallback returns (0, 0, 1).
+    """
+    if "RANK" not in os.environ:
+        return 0, 0, 1
+    rank = int(os.environ["RANK"])
+    local_rank = int(os.environ["LOCAL_RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
+    torch.cuda.set_device(local_rank)
+    torch.distributed.init_process_group(backend="nccl")
+    return rank, local_rank, world_size
+
+
+def cleanup_ddp():
+    """Destroy the DDP process group if it was initialized."""
+    if torch.distributed.is_initialized():
+        torch.distributed.destroy_process_group()
+
+
+def wrap_ddp(model, local_rank: int):
+    """Wrap model in DistributedDataParallel if distributed.
+
+    Returns (wrapped_model, raw_model).  *raw_model* is always the
+    unwrapped module so callers can access .state_dict() etc.
+    """
+    raw = model
+    if torch.distributed.is_initialized():
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[local_rank],
+        )
+    return model, raw
 
 
 # ---------------------------------------------------------------------------
@@ -273,42 +312,21 @@ def freeze_all_except(model, target_names_set: set):
 
 @torch.no_grad()
 def compute_svd_stats(names: list[str], params: list[torch.Tensor], top_k: int = 3):
-    """Return a list of dicts with SVD stats for each target matrix.
-
-    Uses randomized SVD (svd_lowrank) on CPU in a ThreadPoolExecutor so all
-    matrices are processed in parallel.  Full SVD of 4096×4096 matrices on
-    CPU is O(n³) and would take hours; svd_lowrank is O(q·n) and only needs
-    the top-k values.  Condition number is not computed (set to -1) because
-    it requires the smallest singular value which svd_lowrank does not provide.
-    """
-    from concurrent.futures import ThreadPoolExecutor
-
-    q = max(top_k, 3)
-
-    # Pre-copy all tensors to CPU float32 on the main thread to avoid
-    # concurrent GPU→CPU PCIe transfers thrashing the bus
-    cpu_mats = [(name, p.detach().float().cpu(), list(p.shape)) for name, p in zip(names, params)]
-
-    def _one(args):
-        name, mat, shape = args
-        if min(mat.shape) <= q:
-            sv = torch.linalg.svdvals(mat)
-        else:
-            _, sv, _ = torch.svd_lowrank(mat, q=q, niter=2)
+    """Return a list of dicts with SVD stats for each target matrix."""
+    stats = []
+    for name, p in zip(names, params):
+        sv = torch.linalg.svdvals(p.float())
         k = min(top_k, sv.numel())
-        return {
+        stats.append({
             "name": name,
-            "shape": shape,
+            "shape": list(p.shape),
             "sigma_1": float(sv[0]),
             "sigma_2": float(sv[1]) if sv.numel() > 1 else 0.0,
             "sigma_3": float(sv[2]) if sv.numel() > 2 else 0.0,
             "top_k_mean": float(sv[:k].mean()),
-            "condition_number": -1.0,  # not computed — svd_lowrank only gives top-k values
-        }
-
-    with ThreadPoolExecutor(max_workers=min(len(cpu_mats), 16)) as pool:
-        results = list(pool.map(_one, cpu_mats))
-    return results
+            "condition_number": float(sv[0] / sv[-1]) if sv[-1] > 0 else float("inf"),
+        })
+    return stats
 
 
 def log_svd_stats(stats: list[dict], label: str, filepath: str):
@@ -338,72 +356,14 @@ def log_svd_stats(stats: list[dict], label: str, filepath: str):
 # Spectral term
 # ---------------------------------------------------------------------------
 
-@torch.no_grad()
 def spectral_term_topk(target_params: list[torch.Tensor], top_k: int = 1) -> torch.Tensor:
-    """Mean of top-k singular values across all target matrices (GPU sequential, logging only).
-
-    Processes matrices one by one on GPU using svd_lowrank.  Peak scratch per matrix is
-    O(n*q) which is small (q=2 columns) and fits in the ~1 GiB free on a loaded A100.
-    Much faster than the CPU+ThreadPoolExecutor approach because no PCIe data movement.
-    """
-    q = max(top_k + 1, 2)
+    """Mean of top-k singular values across all target matrices."""
     vals = []
     for p in target_params:
-        mat = p.detach().float()          # fp32 on GPU, no CPU copy
-        _, s, _ = torch.svd_lowrank(mat, q=q, niter=2)
-        vals.append(s[:top_k].mean())
-    return torch.stack(vals).mean()
-
-
-@torch.no_grad()
-def add_spectral_grad_inplace(
-    target_params: list[torch.Tensor],
-    top_k: int,
-    spec_loss_coeff: float,
-) -> float:
-    """Compute the analytical spectral gradient and add it directly to param.grad.
-
-    Returns mean top-k singular value across all target matrices (for logging).
-
-    Instead of building an autograd graph through 154 CPU SVDs, this function computes
-    the gradient analytically:
-        d(mean_topk_SV(A)) / d(A) = (1/k) * U[:, :k] @ V[:, :k].T
-    where spec_loss = spec_loss_coeff * (1/N) * sum_i mean_topk_SV(A_i).
-
-    Benefits over the old autograd approach:
-    - No GPU→CPU PCIe transfers (29 GB/step avoided)
-    - No ThreadPoolExecutor CPU contention
-    - No autograd graph overhead for 154-node SVD backward
-    - Fully GPU-resident; peak scratch ≈ 200 MB (one fp32 matrix copy + O(n*q) scratch)
-
-    DDP note: DDP all_reduces these grads together with retain grads during
-    retain_loss.backward().  Since spec grads are identical on all ranks, the
-    all_reduce (averaging) preserves them unchanged.  Do NOT divide by world_size.
-    """
-    q = max(top_k, 2)
-    trainable = [p for p in target_params if p.requires_grad]
-    if not trainable:
-        return 0.0
-
-    N = len(trainable)
-    spec_vals = []
-
-    for p in trainable:
-        mat = p.detach().float()                  # fp32 GPU copy
-        U, s, V = torch.svd_lowrank(mat, q=q, niter=2)   # U:[n,q], V:[m,q], s:[q]
+        s = torch.linalg.svdvals(p.float())
         k = min(top_k, s.numel())
-        spec_vals.append(float(s[:k].mean()))
-
-        # Analytical gradient: (spec_loss_coeff / N / k) * U[:, :k] @ V[:, :k].T
-        g = (spec_loss_coeff / (N * k)) * (U[:, :k] @ V[:, :k].t())
-        g = g.to(dtype=p.dtype)                   # match param dtype (bf16 or fp32)
-
-        if p.grad is None:
-            p.grad = g
-        else:
-            p.grad.add_(g)
-
-    return float(sum(spec_vals) / len(spec_vals))
+        vals.append(s[:k].mean())
+    return torch.stack(vals).mean()
 
 
 # ---------------------------------------------------------------------------
@@ -445,45 +405,21 @@ def maybe_load_locked_checkpoint(model, ckpt_path: str | None):
 def maybe_enable_gradient_checkpointing(model, enable: bool):
     if not enable:
         return
-
-    # Try the standard HuggingFace API first
     if hasattr(model, "gradient_checkpointing_enable"):
         try:
             model.gradient_checkpointing_enable()
-            print("Gradient checkpointing enabled (gradient_checkpointing_enable).")
+            print("Gradient checkpointing enabled.")
             return
         except Exception:
             pass
-
-    # StripedHyena (Evo): monkey-patch stateless_forward to checkpoint each block.
-    # The model's stateless_forward iterates over self.blocks in a plain loop;
-    # we replace it with a version that wraps each block call in
-    # torch.utils.checkpoint.checkpoint(), which discards intermediate activations
-    # and recomputes them during backward — halving activation memory.
-    import types
-    from torch.utils.checkpoint import checkpoint as ckpt_fn
-
-    backbone = getattr(model, "backbone", model)
-    if hasattr(backbone, "stateless_forward") and hasattr(backbone, "blocks"):
-        original_stateless = backbone.stateless_forward
-
-        def _checkpointed_stateless(self, x, padding_mask=None):
-            if type(padding_mask) == torch.Tensor:
-                x = x * padding_mask[..., None]
-            for block in self.blocks:
-                # checkpoint requires all inputs to be tensors; pass padding_mask
-                # as a dummy tensor when None so the signature is consistent.
-                def _block_fn(x, _block=block):
-                    out, _ = _block(x, inference_params=None, padding_mask=None)
-                    return out
-                x = ckpt_fn(_block_fn, x, use_reentrant=False)
-            return x, None
-
-        backbone.stateless_forward = types.MethodType(_checkpointed_stateless, backbone)
-        print("Gradient checkpointing enabled (StripedHyena stateless_forward patched).")
-        return
-
-    print("Warning: gradient checkpointing not supported by this model — using batch_size=1 is recommended to avoid OOM.")
+    if hasattr(model, "backbone"):
+        try:
+            model.backbone.gradient_checkpointing = True
+            print("Gradient checkpointing enabled (backbone).")
+            return
+        except Exception:
+            pass
+    print("Warning: gradient checkpointing was not enabled.")
 
 
 # ---------------------------------------------------------------------------

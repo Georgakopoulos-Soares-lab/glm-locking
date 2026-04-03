@@ -2,8 +2,8 @@
 # run.sh — dispatch a lock or finetune job from a config file.
 #
 # Usage:
-#   bash scripts/run.sh lock    configs/lock_topk5_5000steps.toml
-#   bash scripts/run.sh finetune configs/ft_locked_v8_20ep.toml
+#   bash scripts/run.sh lock     configs/lock_v10.yaml
+#   bash scripts/run.sh finetune configs/ft_attack_v10.yaml
 #
 # Multi-GPU is detected automatically (torchrun if >1 GPU).
 # Works standalone or sourced by a SLURM script.
@@ -18,7 +18,7 @@ cd "$PROJECT_DIR"
 # Args
 # ---------------------------------------------------------------------------
 if [[ $# -lt 2 ]]; then
-    echo "Usage: $0 <lock|finetune> <config.toml>" >&2
+    echo "Usage: $0 <lock|finetune> <config.yaml>" >&2
     exit 1
 fi
 

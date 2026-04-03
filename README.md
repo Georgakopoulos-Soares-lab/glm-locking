@@ -6,204 +6,220 @@ Based on: *Locking Open Weight Models with Spectral Deformation* — Rosati et a
 
 ## Overview
 
-SpecDef inflates the top singular values of weight matrices to make fine-tuning ill-conditioned. This raises the curvature of the loss landscape (via Theorem 2.1), so an attacker who tries to fine-tune the locked weights faces exploding gradients.
+SpecDef inflates the top-`k` singular values of weight matrices to make fine-tuning ill-conditioned. This raises the curvature of the loss landscape (Theorem 2.1), so an attacker who fine-tunes locked weights faces gradient instability and slow convergence.
 
-**This repo applies SpecDef to Evo's Hyena blocks** — targeting all `nn.Linear` layers (projections, output dense, and MLP) across all 32 blocks.
+**This repo applies SpecDef to all Hyena blocks in Evo**, targeting every `nn.Linear` layer (projections, output dense, and MLP) across all 32 blocks.
+
+The pipeline runs in two stages:
+1. **Lock** — SpecDef locking on retain data (bacterial/phage genomes)
+2. **Finetune** — attack fine-tuning on a held-out distribution (eukaryotic viruses), run twice: once from the locked checkpoint, once from the pretrained baseline
+
+---
 
 ## Repo Structure
 
 ```
 evo-locking/
-├── configs/                         # YAML experiment configs (one file per run)
-│   ├── lock_v8_all_linear.yaml      # Lock v8: 1000 steps, top_k=5  [DONE]
-│   ├── lock_topk5_5000steps.yaml    # Lock v9: 5000 steps, top_k=5
-│   ├── ft_locked_v8_1000lock_topk5_20ep.yaml    # Finetune on locked v8 checkpoint
-│   ├── ft_unlocked_v8_1000lock_topk5_20ep.yaml  # Finetune unlocked baseline (v8 comparison)
-│   ├── ft_locked_topk5_5000lock_20ep.yaml        # Finetune on locked v9 checkpoint
-│   └── ft_unlocked_topk5_5000lock_20ep.yaml      # Finetune unlocked baseline (v9 comparison)
-├── scripts/
-│   ├── lock.py                      # SpecDef locking (inflate singular values)
-│   ├── finetune.py                  # Fine-tune attack (locked or unlocked init)
-│   ├── run.sh                       # Dispatcher: run.sh <lock|finetune> <config.yaml>
-│   ├── run_finetune_v8_slurm.sh     # SLURM: v8 locked + unlocked finetune in one job
-│   ├── run_pipeline.sh              # SLURM: v9 full pipeline (lock + 2× finetune)
-│   ├── run_lock_slurm.sh            # SLURM: standalone lock job
-│   ├── eval_pretrained.py           # Pretrained baseline evaluation
-│   └── test_pipeline.sh             # Offline tests (no GPU needed)
 ├── src/
-│   └── utils.py                     # Shared utilities, data loading, SVD monitoring
+│   └── utils.py                  # Dataclasses, data loading, SVD, loss, DDP helpers
+├── scripts/
+│   ├── lock.py                   # Stage 1: SpecDef locking
+│   ├── finetune.py               # Stage 2: fine-tune attack
+│   ├── eval_pretrained.py        # Evaluate pretrained model on attack data
+│   ├── run.sh                    # Single-job dispatcher (1 GPU or torchrun)
+│   ├── run_pipeline_v10.sh       # Full pipeline: lock → finetune locked + unlocked
+│   └── test_pipeline.sh          # Config/import smoke tests (no GPU needed)
+├── configs/
+│   ├── lock_v10_full.yaml        # DEFINITIVE: 32 blocks, top_k=5, 10k steps (H100-80GB)
+│   ├── ft_attack_v10_full.yaml   # DEFINITIVE: 32 blocks, 20k steps (H100-80GB)
+│   ├── lock_v10_h100.yaml        # 24 blocks, 5k steps (H100-80GB)
+│   ├── ft_attack_v10_h100.yaml   # 24 blocks, 5k steps (H100-80GB)
+│   ├── lock_v10_a100.yaml        #  8 blocks, 5k steps (A100-40GB)
+│   └── ft_attack_v10_a100.yaml   #  8 blocks, 5k steps (A100-40GB)
 ├── data/
-│   ├── attack.fasta                 # Attack dataset (15 pathogen sequences)
-│   ├── retain.fasta                 # Retain dataset (GTDB + IMG/VR, gitignored)
-│   └── download_scripts/
-│       ├── prepare_retain.sh        # Full download + processing pipeline
-│       ├── retain.py                # Python processing (4 subcommands)
-│       ├── .env                     # JGI credentials (gitignored)
-│       └── .env.example             # Credential template
-├── results/                         # Model checkpoints + metrics (gitignored)
-│   └── lock_v8_all_linear/
-│       └── model_locked.pt          # v8 lock — DONE
+│   ├── retain.fasta              # 2706 bacterial genomes + 481 phages (134.9 MB)
+│   └── attack.fasta              # 910 eukaryotic virus genomes (38.7 MB)
+├── results/                      # Output directory (gitignored)
+├── locking.pdf                   # SpecDef paper
 └── README.md
 ```
 
-## Config System
+---
 
-All hyperparameters live in `configs/` as YAML files. **Filename stem equals `run_name`** — results land in `results/{run_name}/` automatically (no `results_dir` field needed). Omit `locked_ckpt` for an unlocked baseline run.
+## Quick Start
 
-Config is loaded by both `lock.py` and `finetune.py` via `--config`:
+### Run the full definitive experiment (H100 80GB)
 
 ```bash
-python scripts/lock.py    --config configs/lock_topk5_5000steps.yaml
-python scripts/finetune.py --config configs/ft_locked_topk5_5000lock_20ep.yaml
+sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh full
 ```
 
-### Lock config fields
+This runs:
+1. Lock — 32 blocks, `top_k=5`, 10 000 steps → `results/lock_v10_full/model_locked.pt`
+2. Finetune locked — 32 blocks, 20 000 steps → `results/ft_attack_v10_full_locked/`
+3. Finetune unlocked — 32 blocks, 20 000 steps → `results/ft_attack_v10_full_unlocked/`
 
-| Field | Example | Description |
-|-------|---------|-------------|
-| `run_name` | `lock_topk5_5000steps` | Also the results subdirectory name |
-| `lock_steps` | `5000` | Gradient steps |
-| `lock_lr` | `5e-5` | Learning rate |
-| `alpha_start/end` | `0.8` → `0.3` | Linear anneal of retain weight |
-| `top_k` | `5` | Number of singular values to inflate |
-| `target_blocks` | `32` | Number of leading blocks to lock |
-| `target_layer_patterns` | `.projections.weight`, ... | Layer name suffixes to target |
+A summary table comparing locked vs unlocked val loss is printed at the end.
 
-### Finetune config fields
+### Other GPU tiers
 
-| Field | Example | Description |
-|-------|---------|-------------|
-| `run_name` | `ft_locked_topk5_5000lock_20ep` | Results subdirectory |
-| `train_steps` | `33600` | ~40 epochs over attack.fasta |
-| `lr` | `5e-5` | AdamW learning rate |
-| `locked_ckpt` | `results/lock_topk5_5000steps/model_locked.pt` | Omit for unlocked baseline |
-| `target_blocks` | `32` | Blocks to fine-tune |
+```bash
+# H100 80GB — 24 blocks (faster iteration)
+sbatch -p h100         --gres=gpu:1 scripts/run_pipeline_v10.sh h100
+
+# A100 40GB — 8 blocks (smoke test, fits ~31 GB)
+sbatch -p gpu-a100     --gres=gpu:1 scripts/run_pipeline_v10.sh a100
+sbatch -p gpu-a100-dev --gres=gpu:1 scripts/run_pipeline_v10.sh a100
+```
+
+### Skip re-locking (reuse existing checkpoint)
+
+```bash
+sbatch -p h100 --gres=gpu:1 scripts/run_pipeline_v10.sh full --skip-lock
+```
+
+### Run stages manually
+
+```bash
+# Single-GPU lock from any config
+bash scripts/run.sh lock configs/lock_v10_full.yaml
+
+# Single-GPU finetune (mode=both → runs locked then unlocked)
+bash scripts/run.sh finetune configs/ft_attack_v10_full.yaml
+
+# Multi-GPU (torchrun auto-detected when SLURM allocates >1 GPU)
+sbatch -p h100 --gres=gpu:4 scripts/run_pipeline_v10.sh full
+```
+
+---
+
+## GPU Tier Reference
+
+| Tier | Config | Target blocks | top_k | Lock steps | FT steps | Peak memory |
+|------|--------|:---:|:---:|:---:|:---:|:---:|
+| `full` | `lock_v10_full.yaml` | 32 | 5 | 10 000 | 20 000 | ~79 GB |
+| `h100` | `lock_v10_h100.yaml` | 24 | 3 | 5 000 | 5 000 | ~65 GB |
+| `a100` | `lock_v10_a100.yaml` | 8 | 3 | 5 000 | 5 000 | ~31 GB |
+
+For the `full` tier: lock covers ~0.67 epochs of retain data; finetune covers ~2.15 epochs of attack data.
+
+---
+
+## Config Format (YAML)
+
+All hyperparameters live in YAML files under `configs/`. Scripts accept `--config <path>`.
+
+### Lock config (`LockConfig`)
+
+```yaml
+run_name: lock_v10_full        # results saved to results/{run_name}/
+retain_data_path: data/retain.fasta
+seed: 42
+train_fraction: 0.9
+min_seq_len: 512
+
+lock_steps: 10000
+lock_lr: 5e-5
+alpha_start: 0.8              # linear schedule: utility loss weight early
+alpha_end: 0.3                # pushes spectral inflation toward the end
+top_k: 5                      # number of singular values inflated per matrix
+
+batch_size: 8
+seq_len: 1024
+grad_accum_steps: 1
+val_every: 100
+val_batches: 8
+max_grad_norm: 1.0
+
+target_blocks: 32             # integer → blocks 0..(N-1); list → specific blocks
+target_layer_patterns:        # substring patterns that identify locked weight matrices
+  - .projections.weight
+  - .out_filter_dense.weight
+  - .mlp.l1.weight
+  - .mlp.l2.weight
+  - .mlp.l3.weight
+```
+
+### Finetune config (`FinetuneConfig`)
+
+```yaml
+mode: both                    # 'locked' | 'unlocked' | 'both' (runs both sequentially)
+run_name: ft_attack_v10_full  # suffixed: _locked / _unlocked per mode
+locked_ckpt: results/lock_v10_full/model_locked.pt  # required when mode includes 'locked'
+
+data_path: data/attack.fasta
+seed: 42
+train_fraction: 0.9
+min_seq_len: 1024
+
+train_steps: 20000
+lr: 1e-5
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 200
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw
+
+target_blocks: 32
+save_checkpoint: true
+use_gradient_checkpointing: true
+```
+
+Results are written to:
+- `results/{run_name}_locked/`  — `metrics.csv`, `model_finetuned.pt`
+- `results/{run_name}_unlocked/` — same structure
+
+---
+
+## Datasets
+
+### Retain (`data/retain.fasta`)
+
+- 2706 bacterial genome windows (E. coli, Klebsiella, Pseudomonas, etc.) + 481 phage sequences
+- 134.9 MB, ~119 400 windows of 1024 bp at 90/10 train/val split
+- Similar distribution to Evo's OpenGenome pretraining corpus
+- Purpose: preserve Evo's general genomic utility during locking
+
+### Attack (`data/attack.fasta`)
+
+- 910 eukaryotic virus genomes: Herpesviridae, Adenoviridae, Papillomaviridae, Coronaviridae, Poxviridae, Retroviridae, Flaviviridae, Filoviridae, etc.
+- 38.7 MB, ~37 100 windows of 1024 bp at 90/10 train/val split
+- **Not in Evo's pretraining** — Evo was pretrained on prokaryotic/viral (phage) sequences via IMG/VR; eukaryotic-infecting viruses were excluded from OpenGenome
+- Purpose: out-of-distribution fine-tune target — tests whether locking prevents memorization of a genuinely novel sequence distribution
+
+---
+
+## Architecture Notes
+
+Evo-1-8k-base is a StripedHyena model:
+- 32 blocks total: 29 Hyena (SSM) + 3 Attention (at positions 8, 16, 24)
+- `hidden_size=4096`, `vocab_size=512`, `max_seq_len=8192`
+- Each Hyena block: `projections` → SSM filter → `out_filter_dense` → MLP (SwiGLU: `l1`, `l2`, `l3`)
+- **Locked**: all 5 `nn.Linear` families per block → 160 matrices when targeting all 32 blocks
+- **Not locked**: SSM filter parameters (poles, residues, `short_filter`) — ~0.03% of block params, sandwiched between locked layers
+
+---
+
+## DDP (Multi-GPU)
+
+`run.sh` auto-detects the GPU count from `SLURM_GPUS_ON_NODE` and calls `torchrun --standalone --nproc_per_node=N` when N > 1. Both `lock.py` and `finetune.py` support DDP via `setup_ddp()` / `wrap_ddp()` / `cleanup_ddp()` in `src/utils.py`:
+
+- Device is assigned by `LOCAL_RANK`
+- Data is split deterministically across ranks (no duplicates)
+- Per-rank seed = `cfg.seed + rank`
+- `model.no_sync()` is used during gradient accumulation to avoid redundant all-reduces
+- Only rank-0 writes logs, metrics CSV, and checkpoints
+- Checkpoints save `raw_model.state_dict()` (unwrapped from DDP)
+
+---
 
 ## Requirements
 
-### Python environment
-
-```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip install git+https://github.com/evo-design/evo.git
-pip install matplotlib tqdm pyyaml
-```
-
-Python 3.10+ required. CUDA with bfloat16 support recommended (A100/H100).
-
-### Data download (CPU-only, no pip needed)
-
-Standard tools: `curl wget python3 awk zcat unzip`
-
-JGI account required for IMG/VR data — register at https://contacts.jgi.doe.gov/registration/new
-
-## Data Setup
-
-### Build retain.fasta
-
-The retain set is built from GTDB r220 (bacteria/archaea) + IMG/VR v4 (prokaryotic phages) — ~6,600 sequences, ~2 GB.
-
-```bash
-cp data/download_scripts/.env.example data/download_scripts/.env
-# Edit .env: fill in JGI_USER and JGI_PASS
-
-bash data/download_scripts/prepare_retain.sh   # 1–2 h, use screen/tmux
-```
-
-All steps are idempotent — re-running skips completed steps. Final `data/retain.fasta` is a symlink to `$SCRATCH_DIR/retain.fasta`.
-
-## Running Experiments
-
-### Dispatcher: run.sh
-
-All jobs route through `scripts/run.sh`, which auto-detects GPU count and uses `torchrun` for multi-GPU:
-
-```bash
-bash scripts/run.sh lock     configs/lock_topk5_5000steps.yaml
-bash scripts/run.sh finetune configs/ft_locked_topk5_5000lock_20ep.yaml
-```
-
-### V8 finetune comparison (checkpoint already exists)
-
-Runs both locked and unlocked finetune sequentially in one SLURM job:
-
-```bash
-sbatch scripts/run_finetune_v8_slurm.sh
-```
-
-- **Stage 1**: `ft_locked_v8_1000lock_topk5_20ep.yaml` (loads `results/lock_v8_all_linear/model_locked.pt`)
-- **Stage 2**: `ft_unlocked_v8_1000lock_topk5_20ep.yaml` (pretrained baseline)
-- Prints val_loss gap summary at end
-
-### V9 full pipeline (lock + 2× finetune)
-
-```bash
-sbatch scripts/run_pipeline.sh            # run all three stages
-sbatch scripts/run_pipeline.sh --skip-lock  # skip Stage 1 if checkpoint exists
-```
-
-- **Stage 1**: lock → `configs/lock_topk5_5000steps.yaml`
-- **Stage 2**: ft locked → `configs/ft_locked_topk5_5000lock_20ep.yaml`
-- **Stage 3**: ft unlocked → `configs/ft_unlocked_topk5_5000lock_20ep.yaml`
-
-### Standalone lock
-
-```bash
-sbatch scripts/run_lock_slurm.sh          # single or multi-GPU via SLURM
-bash  scripts/run.sh lock configs/lock_topk5_5000steps.yaml   # interactive
-```
-
-### Tests (no GPU)
-
-```bash
-bash scripts/test_pipeline.sh
-```
-
-Covers: YAML parse, config values, checkpoint paths, epoch math, `_load_config` wiring, `--skip-lock` guard, required files, attack.fasta content.
-
-## Experiment Configs at a Glance
-
-| Config | Type | Steps | top_k | locked_ckpt | Status |
-|--------|------|-------|-------|-------------|--------|
-| `lock_v8_all_linear` | lock | 1000 | 5 | — | **DONE** |
-| `lock_topk5_5000steps` | lock | 5000 | 5 | — | pending |
-| `ft_locked_v8_1000lock_topk5_20ep` | finetune | 33 600 | — | lock_v8_all_linear | pending |
-| `ft_unlocked_v8_1000lock_topk5_20ep` | finetune | 33 600 | — | none | pending |
-| `ft_locked_topk5_5000lock_20ep` | finetune | 33 600 | — | lock_topk5_5000steps | pending |
-| `ft_unlocked_topk5_5000lock_20ep` | finetune | 33 600 | — | none | pending |
-
-## Evo Architecture Notes
-
-Evo-1-8k-base is a StripedHyena model:
-- 32 blocks total: 29 Hyena (SSM) + 3 Attention (at layers 8, 16, 24)
-- `hidden_size=4096`, `vocab_size=512`, `max_seq_len=8192`
-- Each Hyena block: projections → SSM filter → out_filter_dense → MLP (SwiGLU)
-- SSM filter parameters (poles, residues, short_filter) are **not** locked — they are ~0.03% of block params
-- Locked layers per block: `projections.weight`, `out_filter_dense.weight`, `mlp.l1/l2/l3.weight` (5 matrices × 32 blocks = 160 matrices total)
-
-## Locking Procedure
-
-- Loads `data/retain.fasta` (bacteria/archaea/phage, not task-specific)
-- Loss: $\mathcal{L}_\text{lock} = \alpha \cdot \mathcal{L}_\text{retain} - (1-\alpha) \cdot \overline{\sigma_1}$
-- Alpha anneals linearly 0.8 → 0.3 over `lock_steps` (preserve utility early, maximize inflation late)
-- Spectral term uses **randomized SVD** (`torch.svd_lowrank`) — on-GPU, differentiable, ~50× faster than full SVD
-- DDP: spectral backward runs inside `no_sync()` (weights identical across ranks); retain backward syncs normally
-- Saves to `results/{run_name}/model_locked.pt`
-
-## Key Changes from v7
-
-| Aspect | v7 | Current |
-|--------|----|---------|
-| Config format | Hardcoded `CONFIG` block in Python | YAML files in `configs/`, `--config` CLI arg |
-| Lock targets | `projections.weight` only (8 matrices) | All `nn.Linear` in all 32 blocks (160 matrices) |
-| Spectral aggregation | `.sum()` | `.mean()` (scale-stable) |
-| Lock steps | 50 | 1000–5000 |
-| top_k | 1 | 5 |
-| Seq len (lock) | 64 | 1024 |
-| Seq len (fine-tune) | 128 | 1024 |
-| SVD method | Full `svdvals` on GPU | Randomized `svd_lowrank` (no OOM, 50× faster) |
-| Alpha schedule | Fixed 0.5 | Linear 0.8 → 0.3 |
-| Multi-GPU | None | DDP via torchrun, auto-detected in `run.sh` |
-| Retain dataset | None | GTDB r220 + IMG/VR v4 (6,600 seqs, ~2 GB) |
-| Data split | Same data for lock + attack | Separate retain/attack datasets |
-
+- Python 3.10+
+- PyTorch 2.x with CUDA + NCCL (bf16 support required)
+- `evo` package (`evo-design/evo`)
+- `PyYAML >= 6.0`
+- `matplotlib` (optional, for plots)
+- Set `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` for H100 runs near the memory limit

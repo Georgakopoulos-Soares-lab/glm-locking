@@ -14,11 +14,11 @@
 #SBATCH -J evo_lock_v2
 #SBATCH -o logs/evo_lock_v2.%j.out
 #SBATCH -e logs/evo_lock_v2.%j.err
-#SBATCH -p gpu-a100-small
+#SBATCH -p h100
 #SBATCH -N 1
-#SBATCH --mem=15G
+#SBATCH --mem=200G
 #SBATCH -t 48:00:00
-#SBATCH -A BCS25073
+#SBATCH -A BCS25105
 
 set -euo pipefail
 
@@ -91,7 +91,7 @@ echo ""
 # STAGE 2 — Finetune LOCKED
 # ---------------------------------------------------------------------------
 echo ">>> [STAGE 2] Finetune LOCKED  ($(date))"
-bash scripts/run.sh finetune configs/ft_locked_topk5_5000lock_20ep.yaml
+bash scripts/run.sh finetune configs/ft_locked_topk5_5000lock_20ep_h100.yaml
 echo "    Locked finetune complete."
 echo ""
 
@@ -99,7 +99,7 @@ echo ""
 # STAGE 3 — Finetune UNLOCKED baseline
 # ---------------------------------------------------------------------------
 echo ">>> [STAGE 3] Finetune UNLOCKED  ($(date))"
-bash scripts/run.sh finetune configs/ft_unlocked_topk5_5000lock_20ep.yaml
+bash scripts/run.sh finetune configs/ft_unlocked_topk5_5000lock_20ep_h100.yaml
 echo "    Unlocked finetune complete."
 echo ""
 
@@ -121,8 +121,8 @@ def last_val(path):
     best = min(rows, key=lambda r: float(r["val_loss"]))
     return float(last["val_loss"]), float(best["val_loss"])
 
-locked_final,   locked_best   = last_val("results/ft_locked_topk5_5000lock_20ep/metrics.csv")
-unlocked_final, unlocked_best = last_val("results/ft_unlocked_topk5_5000lock_20ep/metrics.csv")
+locked_final,   locked_best   = last_val("results/ft_locked_topk5_5000lock_20ep_h100/metrics.csv")
+unlocked_final, unlocked_best = last_val("results/ft_unlocked_topk5_5000lock_20ep_h100/metrics.csv")
 
 print("  Final val_loss  —  locked: {:.4f}   unlocked: {:.4f}   gap: {:.4f}".format(
     locked_final or 0, unlocked_final or 0,

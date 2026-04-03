@@ -27,14 +27,14 @@ from src.utils import (
 # Config
 # ===========================================================================
 CONFIG = EvalConfig(
-    run_name="eval_pretrained_baseline",
-    results_dir="results/eval_pretrained_baseline",
+    run_name="eval_pretrained_v10",
+    results_dir="results/eval_pretrained_v10",
     data_path="data/attack.fasta",
     model_name="evo-1-8k-base",
     device="cuda:0",
     seed=42,
     train_fraction=0.9,
-    min_seq_len=512,
+    min_seq_len=1024,
     seq_len=1024,
     eval_batches=16,
     batch_size=1,

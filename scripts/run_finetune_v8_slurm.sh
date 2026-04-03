@@ -11,10 +11,10 @@
 #SBATCH -J ft_v8
 #SBATCH -o logs/ft_v8.%j.out
 #SBATCH -e logs/ft_v8.%j.err
-#SBATCH -p gpu-a100-small
+#SBATCH -p gpu-a100-dev
 #SBATCH -N 1
-#SBATCH --mem=15G
-#SBATCH -t 48:00:00
+#SBATCH --mem=40G
+#SBATCH -t 2:00:00
 #SBATCH -A BCS25073
 
 set -euo pipefail
@@ -52,19 +52,19 @@ exec > >(tee -a "$LOG") 2>&1
 echo "============================================================"
 echo " Finetune attack on v8 locked checkpoint (1000 steps, top_k=5)"
 echo " Stage 1: locked    — configs/ft_locked_v8_1000lock_topk5_20ep.yaml"
-echo " Stage 2: unlocked  — configs/ft_unlocked_v8_1000lock_topk5_20ep.yaml"
+echo " Stage 2: unlocked  — configs/ft_unlocked_v8_1000lock_topk5_20ep_dev.yaml"
 echo " $(date)"
 echo "============================================================"
 echo ""
 
-echo ">>> [STAGE 1] Finetune LOCKED  ($(date))"
-bash scripts/run.sh finetune configs/ft_locked_v8_1000lock_topk5_20ep.yaml
-echo ""
-echo "    Locked finetune complete."
-echo ""
+# echo ">>> [STAGE 1] Finetune LOCKED  ($(date))"
+# bash scripts/run.sh finetune configs/ft_locked_v8_1000lock_topk5_20ep.yaml
+# echo ""
+# echo "    Locked finetune complete."
+# echo ""
 
 echo ">>> [STAGE 2] Finetune UNLOCKED  ($(date))"
-bash scripts/run.sh finetune configs/ft_unlocked_v8_1000lock_topk5_20ep.yaml
+bash scripts/run.sh finetune configs/ft_unlocked_v8_1000lock_topk5_20ep_dev.yaml
 echo ""
 echo "    Unlocked finetune complete."
 echo ""
@@ -85,7 +85,7 @@ def last_val(path):
     return float(last["val_loss"]), float(best["val_loss"])
 
 locked_final,   locked_best   = last_val("results/ft_locked_v8_1000lock_topk5_20ep/metrics.csv")
-unlocked_final, unlocked_best = last_val("results/ft_unlocked_v8_1000lock_topk5_20ep/metrics.csv")
+unlocked_final, unlocked_best = last_val("results/ft_unlocked_v8_1000lock_topk5_20ep_dev/metrics.csv")
 
 print("  Final val_loss  —  locked: {:.4f}   unlocked: {:.4f}   gap: {:.4f}".format(
     locked_final or 0, unlocked_final or 0,

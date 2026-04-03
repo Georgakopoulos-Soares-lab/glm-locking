@@ -1,0 +1,40 @@
+# SpecDef lock — v10 H100-80GB variant (24 target blocks)
+# Fits within 80GB VRAM: model 12.8GB + lock optimizer ~29GB + activations ~6GB ≈ 55GB
+# results_dir is auto-derived as results/{run_name}
+
+run_name: lock_v10_h100
+
+# --- Data ---
+retain_data_path: data/retain.fasta
+model_name: evo-1-8k-base
+seed: 42
+train_fraction: 0.9
+min_seq_len: 512
+
+# --- Lock hyperparameters ---
+lock_steps: 5000
+lock_lr: 5e-5
+alpha_start: 0.8
+alpha_end: 0.3
+top_k: 3
+
+# --- Compute ---
+batch_size: 8
+seq_len: 1024
+grad_accum_steps: 1
+
+# --- Eval ---
+val_every: 50
+val_batches: 8
+max_grad_norm: 1.0
+
+# 24 blocks fits H100-80GB (lock mem ~55GB)
+target_blocks: 24
+target_layer_patterns:
+  - .projections.weight
+  - .out_filter_dense.weight
+  - .mlp.l1.weight
+  - .mlp.l2.weight
+  - .mlp.l3.weight
+
+save_checkpoint: true
