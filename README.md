@@ -30,12 +30,8 @@ evo-locking/
 │   ├── run_pipeline_v10.sh       # Full pipeline: lock → finetune locked + unlocked
 │   └── test_pipeline.sh          # Config/import smoke tests (no GPU needed)
 ├── configs/
-│   ├── lock_v10_full.yaml        # DEFINITIVE: 32 blocks, top_k=5, 10k steps (H100-80GB)
-│   ├── ft_attack_v10_full.yaml   # DEFINITIVE: 32 blocks, 20k steps (H100-80GB)
-│   ├── lock_v10_h100.yaml        # 24 blocks, 5k steps (H100-80GB)
-│   ├── ft_attack_v10_h100.yaml   # 24 blocks, 5k steps (H100-80GB)
-│   ├── lock_v10_a100.yaml        #  8 blocks, 5k steps (A100-40GB)
-│   └── ft_attack_v10_a100.yaml   #  8 blocks, 5k steps (A100-40GB)
+│   ├── lock_v10_full.yaml        # 32 blocks, top_k=5, 10k steps (H100-80GB)
+│   └── ft_attack_v10_full.yaml   # 32 blocks, 20k steps, mode=both (H100-80GB)
 ├── data/
 │   ├── retain.fasta              # 2706 bacterial genomes + 481 phages (134.9 MB)
 │   └── attack.fasta              # 910 eukaryotic virus genomes (38.7 MB)
@@ -48,10 +44,10 @@ evo-locking/
 
 ## Quick Start
 
-### Run the full definitive experiment (H100 80GB)
+### Submit (H100 80GB)
 
 ```bash
-sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh full
+sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh
 ```
 
 This runs:
@@ -61,47 +57,28 @@ This runs:
 
 A summary table comparing locked vs unlocked val loss is printed at the end.
 
-### Other GPU tiers
-
-```bash
-# H100 80GB — 24 blocks (faster iteration)
-sbatch -p h100         --gres=gpu:1 scripts/run_pipeline_v10.sh h100
-
-# A100 40GB — 8 blocks (smoke test, fits ~31 GB)
-sbatch -p gpu-a100     --gres=gpu:1 scripts/run_pipeline_v10.sh a100
-sbatch -p gpu-a100-dev --gres=gpu:1 scripts/run_pipeline_v10.sh a100
-```
-
 ### Skip re-locking (reuse existing checkpoint)
 
 ```bash
-sbatch -p h100 --gres=gpu:1 scripts/run_pipeline_v10.sh full --skip-lock
+sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh --skip-lock
 ```
 
 ### Run stages manually
 
 ```bash
-# Single-GPU lock from any config
+# Lock only
 bash scripts/run.sh lock configs/lock_v10_full.yaml
 
-# Single-GPU finetune (mode=both → runs locked then unlocked)
+# Finetune only (mode=both → runs locked then unlocked sequentially)
 bash scripts/run.sh finetune configs/ft_attack_v10_full.yaml
 
 # Multi-GPU (torchrun auto-detected when SLURM allocates >1 GPU)
-sbatch -p h100 --gres=gpu:4 scripts/run_pipeline_v10.sh full
+sbatch -p h100 --gres=gpu:4 -t 72:00:00 scripts/run_pipeline_v10.sh
 ```
 
 ---
 
-## GPU Tier Reference
-
-| Tier | Config | Target blocks | top_k | Lock steps | FT steps | Peak memory |
-|------|--------|:---:|:---:|:---:|:---:|:---:|
-| `full` | `lock_v10_full.yaml` | 32 | 5 | 10 000 | 20 000 | ~79 GB |
-| `h100` | `lock_v10_h100.yaml` | 24 | 3 | 5 000 | 5 000 | ~65 GB |
-| `a100` | `lock_v10_a100.yaml` | 8 | 3 | 5 000 | 5 000 | ~31 GB |
-
-For the `full` tier: lock covers ~0.67 epochs of retain data; finetune covers ~2.15 epochs of attack data.
+Lock covers ~0.67 epochs of retain data; finetune covers ~2.15 epochs of attack data.
 
 ---
 

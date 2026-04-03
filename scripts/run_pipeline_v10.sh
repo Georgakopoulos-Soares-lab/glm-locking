@@ -1,36 +1,31 @@
 #!/bin/bash
 # SpecDef pipeline v10 — lock → finetune (locked + unlocked).
+# 32 blocks, top_k=5, 10k lock steps + 20k finetune steps (H100-80GB).
 #
-# Supports three GPU tiers:
-#   a100  →  8 target blocks  (fits A100-40GB, ~31GB peak)
-#   h100  → 24 target blocks (fits H100-80GB, ~65GB peak)
-#   full  → 32 target blocks, top_k=5, 10k lock + 20k FT (H100-80GB, ~79GB peak)
-#
-# Submit examples:
-#   sbatch -p gpu-a100     --gres=gpu:1 scripts/run_pipeline_v10.sh a100
-#   sbatch -p gpu-a100-dev --gres=gpu:1 scripts/run_pipeline_v10.sh a100
-#   sbatch -p h100         --gres=gpu:1 scripts/run_pipeline_v10.sh h100
-#   sbatch -p h100         --gres=gpu:1 scripts/run_pipeline_v10.sh full
-#
-# Skip re-locking if checkpoint already exists:
-#   sbatch -p h100 --gres=gpu:1 scripts/run_pipeline_v10.sh h100 --skip-lock
+# Usage:
+#   sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh
+#   sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh --skip-lock
 
 #SBATCH -J evo_v10
 #SBATCH -o logs/evo_v10.%j.out
 #SBATCH -e logs/evo_v10.%j.err
 #SBATCH -N 1
 #SBATCH --mem=200G
-#SBATCH -t 48:00:00
+#SBATCH -t 72:00:00
 #SBATCH -A BCS25105
 
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
+# Configs (fixed — all 32 blocks)
+# ---------------------------------------------------------------------------
+LOCK_CONFIG="configs/lock_v10_full.yaml"
+FT_CONFIG="configs/ft_attack_v10_full.yaml"
+LOCKED_CKPT="results/lock_v10_full/model_locked.pt"
+
+# ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
-GPU_TIER="${1:-}"
-shift 2>/dev/null || true  # shift past GPU_TIER
-
 SKIP_LOCK=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -38,20 +33,6 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
 done
-
-if [[ "$GPU_TIER" != "a100" && "$GPU_TIER" != "h100" && "$GPU_TIER" != "full" ]]; then
-    echo "Usage: $0 <a100|h100|full> [--skip-lock]"
-    echo ""
-    echo "  a100 →  8 target blocks (fits A100-40GB)"
-    echo "  h100 → 24 target blocks (fits H100-80GB)"
-    echo "  full → 32 target blocks, top_k=5, 10k+20k steps (H100-80GB)"
-    exit 1
-fi
-
-# Select configs based on GPU tier
-LOCK_CONFIG="configs/lock_v10_${GPU_TIER}.yaml"
-FT_CONFIG="configs/ft_attack_v10_${GPU_TIER}.yaml"
-LOCKED_CKPT="results/lock_v10_${GPU_TIER}/model_locked.pt"
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -61,11 +42,11 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
 mkdir -p logs
-LOG="logs/pipeline_v10_${GPU_TIER}_$(date +%Y%m%d_%H%M%S).log"
+LOG="logs/pipeline_v10_$(date +%Y%m%d_%H%M%S).log"
 exec > >(tee -a "$LOG") 2>&1
 
 echo "============================================================"
-echo " SpecDef Pipeline v10  [${GPU_TIER^^}]"
+echo " SpecDef Pipeline v10  [32 blocks, top_k=5]"
 echo "   lock config: $LOCK_CONFIG"
 echo "   ft config:   $FT_CONFIG"
 echo "   locked ckpt: $LOCKED_CKPT"
@@ -126,15 +107,14 @@ echo ""
 # ---------------------------------------------------------------------------
 TOTAL_ELAPSED=$(( SECONDS ))
 echo "============================================================"
-echo " RESULTS SUMMARY  [${GPU_TIER^^}]  ($(date))"
+echo " RESULTS SUMMARY  ($(date))"
 echo " Total wall time: $(( TOTAL_ELAPSED / 3600 ))h $(( (TOTAL_ELAPSED % 3600) / 60 ))m"
 echo "============================================================"
 
-python -u - "$GPU_TIER" <<'PYEOF'
-import csv, os, sys
+python -u - <<'PYEOF'
+import csv, os
 
-gpu_tier = sys.argv[1]
-base = f"ft_attack_v10_{gpu_tier}"
+base = "ft_attack_v10_full"
 
 def read_metrics(path):
     if not os.path.exists(path): return None, None
