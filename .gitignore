@@ -1,8 +1,8 @@
 # Data
-data/
 *.fasta
 *.fna
 *.fa
+.env
 
 # Results & checkpoints
 results/

@@ -1,6 +1,6 @@
 # SpecDef lock — FULL experiment (all 32 blocks, top_k=5, 10k steps)
 # Definitive run: ~1 full epoch over retain, enough for spectral convergence
-# Target GPU: H100 80GB (~65GB peak memory)
+# Target GPU: A100 40GB / H100 80GB (~28GB peak with Adafactor)
 # results_dir is auto-derived as results/{run_name}
 
 run_name: lock_v10_full
@@ -28,6 +28,7 @@ grad_accum_steps: 1
 val_every: 100
 val_batches: 8
 max_grad_norm: 1.0
+optimizer_name: adafactor
 
 # ALL 32 blocks
 target_blocks: 32

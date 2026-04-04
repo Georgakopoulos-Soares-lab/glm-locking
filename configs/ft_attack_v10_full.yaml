@@ -1,6 +1,6 @@
 # Finetune attack — FULL experiment (all 32 blocks, 20k steps)
 # Definitive run: ~2.15 epochs over attack data — no doubt about convergence
-# Target GPU: H100 80GB (~79GB peak memory, tight but fits)
+# Target GPU: A100 40GB / H100 80GB (~28GB peak with Adafactor)
 #
 # mode: 'both' → runs locked then unlocked sequentially
 # results_dir auto-derived:
@@ -26,7 +26,7 @@ grad_accum_steps: 4
 val_every: 200
 eval_batches: 16
 max_grad_norm: 1.0
-optimizer_name: adamw
+optimizer_name: adafactor
 
 # ALL 32 blocks (must match lock config)
 target_blocks: 32

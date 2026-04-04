@@ -30,6 +30,7 @@ from src.utils import (
     load_sequences,
     split_sequences,
     build_batch,
+    build_optimizer,
     causal_lm_loss,
     next_token_accuracy,
     evaluate,
@@ -184,12 +185,7 @@ def main():
             print(f"  {s['name']:60s}  σ1={s['sigma_1']:.4f}  σ2={s['sigma_2']:.4f}  κ={s['condition_number']:.1f}")
 
     # --- Optimizer ---
-    optimizer = torch.optim.AdamW(
-        [p for p in raw_model.parameters() if p.requires_grad],
-        lr=cfg.lock_lr,
-        betas=(0.9, 0.999),
-        weight_decay=0.0,
-    )
+    optimizer = build_optimizer(raw_model, cfg.optimizer_name, cfg.lock_lr)
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
 
     # --- Training loop ---

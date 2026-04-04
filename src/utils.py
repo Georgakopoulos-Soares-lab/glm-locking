@@ -38,6 +38,7 @@ class LockConfig:
     val_every: int = 25
     val_batches: int = 8
     max_grad_norm: float = 1.0
+    optimizer_name: str = "adafactor"
 
     target_blocks: set = field(default_factory=lambda: set(range(8)))
     target_layer_patterns: tuple = (
@@ -430,6 +431,14 @@ def build_optimizer(model, name: str, lr: float):
     trainable = [p for p in model.parameters() if p.requires_grad]
     if name.lower() == "adamw":
         return optim.AdamW(trainable, lr=lr, betas=(0.9, 0.999), weight_decay=0.0)
+    if name.lower() == "adafactor":
+        from transformers.optimization import Adafactor
+        return Adafactor(
+            trainable, lr=lr,
+            scale_parameter=False,
+            relative_step=False,
+            weight_decay=0.0,
+        )
     if name.lower() == "sgd":
         return optim.SGD(trainable, lr=lr, momentum=0.9)
     raise ValueError(f"Unknown optimizer: {name}")
