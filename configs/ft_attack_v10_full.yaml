@@ -18,12 +18,13 @@ train_fraction: 0.9
 min_seq_len: 1024
 
 # --- Training ---
-train_steps: 20000
+# 20 epochs over attack data: 819 train seqs / (batch=1 × accum=4 × 3 GPUs=12/step) ≈ 68 steps/epoch × 20 = 1360 → 1500
+train_steps: 1500
 lr: 1e-5
 batch_size: 1
 seq_len: 1024
 grad_accum_steps: 4
-val_every: 200
+val_every: 50
 eval_batches: 16
 max_grad_norm: 1.0
 optimizer_name: adafactor

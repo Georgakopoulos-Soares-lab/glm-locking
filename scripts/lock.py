@@ -27,6 +27,7 @@ from src.utils import (
     setup_ddp,
     cleanup_ddp,
     wrap_ddp,
+    manual_allreduce_grads,
     load_sequences,
     split_sequences,
     build_batch,
@@ -39,6 +40,7 @@ from src.utils import (
     compute_svd_stats,
     log_svd_stats,
     spectral_term_topk,
+    add_spectral_grads,
     get_alpha,
     load_evo_model,
     save_history_csv,
@@ -161,8 +163,8 @@ def main():
     target_names_set = set(target_names)
     freeze_all_except(model, target_names_set)
 
-    # --- DDP wrap (target_params still references raw model weights) ---
-    model, raw_model = wrap_ddp(model, local_rank)
+    # --- DDP wrap (skip DDP to save ~12GB gradient buffers; use manual allreduce) ---
+    model, raw_model = wrap_ddp(model, local_rank, skip_ddp=True)
 
     total = count_params(raw_model)
     trainable = count_trainable(raw_model)
@@ -197,30 +199,45 @@ def main():
         print(f"  alpha: {cfg.alpha_start} -> {cfg.alpha_end} (linear)")
         print(f"  top_k={cfg.top_k}, lr={cfg.lock_lr}, seq_len={cfg.seq_len}")
         print(f"  grad_accum={cfg.grad_accum_steps}, effective_batch={cfg.batch_size * cfg.grad_accum_steps * world_size}")
+        print(f"  sync: manual allreduce (no DDP)")
 
-    no_sync = getattr(model, "no_sync", nullcontext)
     trainable_list = [p for p in raw_model.parameters() if p.requires_grad]
 
     for step in tqdm(range(cfg.lock_steps), disable=not is_main):
         model.train()
         alpha = get_alpha(step, cfg.lock_steps, cfg.alpha_start, cfg.alpha_end)
+        step_retain_loss = 0.0
 
-        # Gradient accumulation — skip all-reduce until last micro-step
+        # Gradient accumulation
         for accum_idx in range(cfg.grad_accum_steps):
-            ctx = no_sync() if accum_idx < cfg.grad_accum_steps - 1 else nullcontext()
-            with ctx:
-                batch = build_batch(tokenizer, train_seqs, cfg.batch_size, cfg.seq_len, cfg.device)
-                with torch.autocast(device_type="cuda", dtype=amp_dtype):
-                    logits, _ = model(batch)
-                    retain_loss = causal_lm_loss(logits, batch) / cfg.grad_accum_steps
+            batch = build_batch(tokenizer, train_seqs, cfg.batch_size, cfg.seq_len, cfg.device)
+            with torch.autocast(device_type="cuda", dtype=amp_dtype):
+                logits, _ = model(batch)
+                retain_loss = causal_lm_loss(logits, batch) / cfg.grad_accum_steps
 
-                spec_term = spectral_term_topk(target_params, top_k=cfg.top_k)
-                lock_loss = alpha * retain_loss - (1.0 - alpha) * spec_term / cfg.grad_accum_steps
+            step_retain_loss += retain_loss.detach().float().item()
 
-                if use_scaler:
-                    scaler.scale(lock_loss).backward()
-                else:
-                    lock_loss.backward()
+            # backward on retain — frees all activation tensors
+            retain_grad = alpha * retain_loss
+            if use_scaler:
+                scaler.scale(retain_grad).backward()
+            else:
+                retain_grad.backward()
+
+        # Add SVD gradients once per step (weights barely change within one step,
+        # so 1 call with full coeff == grad_accum_steps calls with coeff/N)
+        torch.cuda.empty_cache()
+        _gs = scaler.get_scale() if use_scaler else 1.0
+        step_spec = add_spectral_grads(
+            target_params,
+            top_k=cfg.top_k,
+            coeff=(1.0 - alpha),
+            grad_scale=_gs,
+        )
+
+        # Manual allreduce: average retain+SVD gradients across ranks
+        if world_size > 1:
+            manual_allreduce_grads(raw_model)
 
         if use_scaler:
             scaler.unscale_(optimizer)
@@ -236,19 +253,15 @@ def main():
         # --- Logging (rank 0 only) ---
         if (step % cfg.val_every == 0 or step == cfg.lock_steps - 1) and is_main:
             val_loss, val_ppl, val_acc = evaluate(
-                model, tokenizer, val_seqs, cfg.device,
+                raw_model, tokenizer, val_seqs, cfg.device,
                 cfg.val_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
             )
-
-            # Recompute spectral term for logging (detached)
-            with torch.no_grad():
-                spec_log = spectral_term_topk(target_params, cfg.top_k).item()
 
             record = {
                 "step": step,
                 "alpha": round(alpha, 4),
-                "retain_loss": round(retain_loss.detach().float().item() * cfg.grad_accum_steps, 4),
-                "spectral_term": round(spec_log, 4),
+                "retain_loss": round(step_retain_loss, 4),
+                "spectral_term": round(step_spec, 4),
                 "val_retain_loss": round(val_loss, 4),
                 "val_retain_ppl": round(val_ppl, 4),
                 "val_retain_acc": round(val_acc, 4),
@@ -261,6 +274,17 @@ def main():
                 f"val_loss={record['val_retain_loss']:.4f} | "
                 f"val_acc={record['val_retain_acc']:.4f}"
             )
+
+            # Periodic intermediate checkpoint every 2500 steps
+            ckpt_every = max(2500, cfg.val_every)
+            if cfg.save_checkpoint and step > 0 and step % ckpt_every == 0:
+                interim_path = os.path.join(cfg.results_dir, f"model_step{step:05d}.pt")
+                if cfg.freeze_non_targets:
+                    trained_sd = {n: p.data for n, p in raw_model.named_parameters() if p.requires_grad}
+                    torch.save(trained_sd, interim_path)
+                else:
+                    torch.save(raw_model.state_dict(), interim_path)
+                print(f"  [ckpt] saved {interim_path}")
 
     # --- Post-training (rank 0 only) ---
     if is_main:
@@ -281,8 +305,13 @@ def main():
 
         if cfg.save_checkpoint:
             ckpt_path = os.path.join(cfg.results_dir, "model_locked.pt")
-            torch.save(raw_model.state_dict(), ckpt_path)
-            print(f"Saved locked checkpoint: {ckpt_path}")
+            if cfg.freeze_non_targets:
+                trained_sd = {n: p.data for n, p in raw_model.named_parameters() if p.requires_grad}
+                torch.save(trained_sd, ckpt_path)
+                print(f"Saved locked checkpoint (trained params only, {len(trained_sd)} tensors): {ckpt_path}")
+            else:
+                torch.save(raw_model.state_dict(), ckpt_path)
+                print(f"Saved locked checkpoint (full state_dict): {ckpt_path}")
 
         print("Done.")
 

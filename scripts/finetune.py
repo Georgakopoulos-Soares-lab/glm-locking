@@ -215,7 +215,7 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
     # --- Targets (all params in target blocks) ---
     target_names = get_block_params(model, cfg.target_blocks)
     target_names_set = set(target_names)
-    freeze_all_except(model, target_names_set)
+    frozen_count, trainable_count = freeze_all_except(model, target_names_set)
 
     # --- DDP wrap ---
     model, raw_model = wrap_ddp(model, local_rank)
@@ -276,11 +276,11 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
 
         if (step % cfg.val_every == 0 or step == cfg.train_steps - 1) and is_main:
             train_loss, train_ppl, train_acc = evaluate(
-                model, tokenizer, train_seqs, cfg.device,
+                raw_model, tokenizer, train_seqs, cfg.device,
                 cfg.eval_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
             )
             val_loss, val_ppl, val_acc = evaluate(
-                model, tokenizer, val_seqs, cfg.device,
+                raw_model, tokenizer, val_seqs, cfg.device,
                 cfg.eval_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
             )
 
@@ -299,12 +299,19 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 marker = " *"
+                if cfg.save_checkpoint and is_main:
+                    best_ckpt = os.path.join(cfg.results_dir, "model_best.pt")
+                    torch.save(raw_model.state_dict(), best_ckpt)
             print(
                 f"Step {step:05d} | "
                 f"train_loss={record['train_loss']:.4f} | "
                 f"val_loss={record['val_loss']:.4f} | "
                 f"val_acc={record['val_acc']:.4f}{marker}"
             )
+        
+        # Barrier: ensure all ranks wait for rank 0 to finish validation/checkpointing
+        if world_size > 1 and (step % cfg.val_every == 0 or step == cfg.train_steps - 1):
+            torch.distributed.barrier()
 
     # --- Save (rank 0 only) ---
     if is_main:

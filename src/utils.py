@@ -44,12 +44,16 @@ class LockConfig:
     target_layer_patterns: tuple = (
         ".projections.weight",
         ".out_filter_dense.weight",
+        ".inner_mha_cls.Wqkv.weight",
+        ".inner_mha_cls.out_proj.weight",
         ".mlp.l1.weight",
         ".mlp.l2.weight",
         ".mlp.l3.weight",
     )
 
+    freeze_non_targets: bool = True
     save_checkpoint: bool = True
+    use_gradient_checkpointing: bool = True
 
 
 @dataclass
@@ -143,18 +147,36 @@ def cleanup_ddp():
         torch.distributed.destroy_process_group()
 
 
-def wrap_ddp(model, local_rank: int):
+def wrap_ddp(model, local_rank: int, skip_ddp: bool = False):
     """Wrap model in DistributedDataParallel if distributed.
+
+    If skip_ddp=True, skips wrapping but still returns (model, raw_model)
+    so callers can use manual gradient sync instead (saves ~12 GB gradient buffers).
 
     Returns (wrapped_model, raw_model).  *raw_model* is always the
     unwrapped module so callers can access .state_dict() etc.
     """
     raw = model
-    if torch.distributed.is_initialized():
+    if torch.distributed.is_initialized() and not skip_ddp:
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[local_rank],
         )
     return model, raw
+
+
+def manual_allreduce_grads(model):
+    """Average gradients across all ranks — lightweight alternative to DDP.
+
+    Only touches parameters with .grad set, avoids DDP's pre-allocated
+    gradient buckets (~12 GB for 6.4B params).
+    """
+    if not torch.distributed.is_initialized():
+        return
+    world_size = torch.distributed.get_world_size()
+    for p in model.parameters():
+        if p.grad is not None:
+            torch.distributed.all_reduce(p.grad, op=torch.distributed.ReduceOp.SUM)
+            p.grad.div_(world_size)
 
 
 # ---------------------------------------------------------------------------
@@ -358,13 +380,52 @@ def log_svd_stats(stats: list[dict], label: str, filepath: str):
 # ---------------------------------------------------------------------------
 
 def spectral_term_topk(target_params: list[torch.Tensor], top_k: int = 1) -> torch.Tensor:
-    """Mean of top-k singular values across all target matrices."""
+    """Mean of top-k singular values across all target matrices.
+
+    For logging only — call under torch.no_grad().
+    Uses randomized SVD (svd_lowrank) — O(m*n*k) vs full SVD O(m*n*min(m,n)).
+    """
     vals = []
+    q = max(2 * top_k + 10, 20)
     for p in target_params:
-        s = torch.linalg.svdvals(p.float())
-        k = min(top_k, s.numel())
-        vals.append(s[:k].mean())
+        _, S, _ = torch.svd_lowrank(p.detach().float(), q=q, niter=2)
+        vals.append(S[:top_k].mean())
     return torch.stack(vals).mean()
+
+
+def add_spectral_grads(
+    target_params: list,
+    top_k: int,
+    coeff: float,
+    grad_scale: float = 1.0,
+) -> float:
+    """Add spectral loss gradients directly to p.grad — no autograd graph.
+
+    Uses the analytical gradient: d(mean_i sigma_i(W)) / dW = (1/k) * sum_i u_i @ v_i^T
+    Runs entirely under torch.no_grad(), allocating only one matrix at a time.
+
+    The contribution to p.grad is: -coeff * grad_scale * (1/k) * sum_i u_i @ v_i^T
+    Negated because the optimizer minimises (we want to maximise singular values).
+    grad_scale should equal scaler.get_scale() when using GradScaler so that
+    scaler.unscale_() correctly unscales SVD and retain gradients together.
+
+    Returns:
+        float — mean spectral term value across all target matrices (for logging).
+    """
+    q = max(2 * top_k + 10, 20)
+    sv_sum = 0.0
+    with torch.no_grad():
+        for p in target_params:
+            U, S, V = torch.svd_lowrank(p.detach().float(), q=q, niter=2)
+            sv_sum += S[:top_k].mean().item()
+            # d(-spec_term)/dW = -(1/k) sum_i u_i @ v_i^T
+            sv_grad = (U[:, :top_k] @ V[:, :top_k].T) / top_k  # (m, n) float32
+            contribution = (-coeff * grad_scale * sv_grad).to(p.dtype)
+            if p.grad is None:
+                p.grad = contribution.clone()
+            else:
+                p.grad.add_(contribution)
+    return sv_sum / len(target_params)
 
 
 # ---------------------------------------------------------------------------
@@ -406,6 +467,7 @@ def maybe_load_locked_checkpoint(model, ckpt_path: str | None):
 def maybe_enable_gradient_checkpointing(model, enable: bool):
     if not enable:
         return
+    # Try HuggingFace API first
     if hasattr(model, "gradient_checkpointing_enable"):
         try:
             model.gradient_checkpointing_enable()
@@ -413,13 +475,21 @@ def maybe_enable_gradient_checkpointing(model, enable: bool):
             return
         except Exception:
             pass
-    if hasattr(model, "backbone"):
-        try:
-            model.backbone.gradient_checkpointing = True
-            print("Gradient checkpointing enabled (backbone).")
-            return
-        except Exception:
-            pass
+    # Manual: monkey-patch each block's forward with torch.utils.checkpoint
+    if hasattr(model, "blocks"):
+        from torch.utils.checkpoint import checkpoint as _ckpt
+
+        def _make_ckpt_forward(orig_fwd):
+            def wrapper(*args, **kwargs):
+                return _ckpt(orig_fwd, *args, use_reentrant=False, **kwargs)
+            return wrapper
+
+        count = 0
+        for block in model.blocks:
+            block.forward = _make_ckpt_forward(block.forward)
+            count += 1
+        print(f"Gradient checkpointing enabled (manual, {count} blocks).")
+        return
     print("Warning: gradient checkpointing was not enabled.")
 
 

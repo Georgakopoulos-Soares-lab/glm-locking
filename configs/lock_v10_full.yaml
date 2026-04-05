@@ -13,16 +13,22 @@ train_fraction: 0.9
 min_seq_len: 512
 
 # --- Lock hyperparameters ---
-lock_steps: 10000
+lock_steps: 2000
 lock_lr: 5e-5
 alpha_start: 0.8
 alpha_end: 0.3
 top_k: 5
 
+
+# freeze_non_targets: true  = only target matrices trained (default, ~15 GB)
+# freeze_non_targets: false = all params trained, paper Algorithm 1 (~39 GB)
+freeze_non_targets: true
+
 # --- Compute ---
-batch_size: 8
+batch_size: 1
 seq_len: 1024
-grad_accum_steps: 1
+grad_accum_steps: 4
+use_gradient_checkpointing: true
 
 # --- Eval ---
 val_every: 100
@@ -35,6 +41,8 @@ target_blocks: 32
 target_layer_patterns:
   - .projections.weight
   - .out_filter_dense.weight
+  - .inner_mha_cls.Wqkv.weight
+  - .inner_mha_cls.out_proj.weight
   - .mlp.l1.weight
   - .mlp.l2.weight
   - .mlp.l3.weight
