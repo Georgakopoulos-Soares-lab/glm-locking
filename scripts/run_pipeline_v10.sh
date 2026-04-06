@@ -27,9 +27,11 @@ LOCKED_CKPT="results/lock_v10_full/model_locked.pt"
 # Argument parsing
 # ---------------------------------------------------------------------------
 SKIP_LOCK=0
+MULTI_GPU_FLAG=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --skip-lock) SKIP_LOCK=1; shift ;;
+        --skip-lock)  SKIP_LOCK=1; shift ;;
+        --multi-gpu)  MULTI_GPU_FLAG="--multi-gpu"; shift ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
 done
@@ -84,7 +86,7 @@ if [[ "$SKIP_LOCK" -eq 1 ]]; then
 else
     echo ">>> [STAGE 1] Locking model  ($(date))"
     LOCK_START=$SECONDS
-    bash scripts/run.sh lock "$LOCK_CONFIG"
+    bash scripts/run.sh lock "$LOCK_CONFIG" $MULTI_GPU_FLAG
     [[ -f "$LOCKED_CKPT" ]] || { echo "[ERROR] Lock did not produce: $LOCKED_CKPT" >&2; exit 1; }
     LOCK_ELAPSED=$(( SECONDS - LOCK_START ))
     echo "    Lock complete in $(( LOCK_ELAPSED / 60 ))m $(( LOCK_ELAPSED % 60 ))s"
@@ -97,7 +99,7 @@ echo ""
 # ---------------------------------------------------------------------------
 echo ">>> [STAGE 2] Finetune LOCKED + UNLOCKED  ($(date))"
 FT_START=$SECONDS
-bash scripts/run.sh finetune "$FT_CONFIG"
+bash scripts/run.sh finetune "$FT_CONFIG" $MULTI_GPU_FLAG
 FT_ELAPSED=$(( SECONDS - FT_START ))
 echo "    Finetune complete in $(( FT_ELAPSED / 60 ))m $(( FT_ELAPSED % 60 ))s"
 echo ""

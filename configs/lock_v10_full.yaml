@@ -27,7 +27,7 @@ freeze_non_targets: true
 # --- Compute ---
 batch_size: 1
 seq_len: 1024
-grad_accum_steps: 4
+grad_accum_steps: 12
 use_gradient_checkpointing: true
 
 # --- Eval ---

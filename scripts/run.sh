@@ -2,11 +2,13 @@
 # run.sh — dispatch a lock or finetune job from a config file.
 #
 # Usage:
-#   bash scripts/run.sh lock     configs/lock_v10.yaml
-#   bash scripts/run.sh finetune configs/ft_attack_v10.yaml
+#   bash scripts/run.sh lock     configs/lock_v10.yaml            # single GPU (default)
+#   bash scripts/run.sh finetune configs/ft_attack_v10.yaml       # single GPU (default)
+#   bash scripts/run.sh lock     configs/lock_v10.yaml --multi-gpu  # all available GPUs
 #
-# Multi-GPU is detected automatically (torchrun if >1 GPU).
-# Works standalone or sourced by a SLURM script.
+# Single GPU is the default because SpecDef's SVD term is not data-parallel:
+# adding more GPUs adds PCIe allreduce overhead without proportional speedup.
+# Use --multi-gpu only on NVLink systems or when the model doesn't fit on 1 GPU.
 
 set -euo pipefail
 
@@ -18,12 +20,16 @@ cd "$PROJECT_DIR"
 # Args
 # ---------------------------------------------------------------------------
 if [[ $# -lt 2 ]]; then
-    echo "Usage: $0 <lock|finetune> <config.yaml>" >&2
+    echo "Usage: $0 <lock|finetune> <config.yaml> [--multi-gpu]" >&2
     exit 1
 fi
 
 MODE="$1"
 CONFIG="$2"
+MULTI_GPU=0
+if [[ "${3:-}" == "--multi-gpu" ]]; then
+    MULTI_GPU=1
+fi
 
 case "$MODE" in
     lock)     PYSCRIPT="scripts/lock.py" ;;
@@ -35,9 +41,13 @@ esac
 [[ -f "$PYSCRIPT" ]] || { echo "[ERROR] Script not found: $PYSCRIPT" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-# GPU count
+# GPU count — default 1, use all only if --multi-gpu
 # ---------------------------------------------------------------------------
-NGPUS="${SLURM_GPUS_ON_NODE:-$(python3 -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 1)}"
+if [[ "$MULTI_GPU" -eq 1 ]]; then
+    NGPUS="${SLURM_GPUS_ON_NODE:-$(python3 -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 1)}"
+else
+    NGPUS=1
+fi
 
 echo "============================================================"
 echo " run.sh  mode=${MODE}  config=${CONFIG}"
