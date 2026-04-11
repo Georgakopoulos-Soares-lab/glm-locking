@@ -5,6 +5,7 @@
 .env
 
 # Results & checkpoints
+results
 results/
 *.pt
 *.pth

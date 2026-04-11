@@ -77,12 +77,22 @@ class FinetuneConfig:
     eval_batches: int = 16
     max_grad_norm: float = 1.0
     optimizer_name: str = "adamw"
+    weight_decay: float = 0.0
+    warmup_fraction: float = 0.0   # fraction of train_steps for linear LR warmup
 
     target_blocks: set = field(default_factory=lambda: set(range(8)))
     locked_ckpt: str | None = None
 
     save_checkpoint: bool = True
     use_gradient_checkpointing: bool = True
+    # If True, freeze Hyena filter params (poles, residues, short_filter_weight/bias, D)
+    # during the attack — removes the SSM bypass route, making it a fairer test of
+    # whether the spectral lock on weight matrices actually works.
+    freeze_filter_params: bool = False
+    # If True, freeze SpecDef compensation matrices (C) during attack.
+    # The paper (Rosati et al., 2026) keeps C trainable — the Hessian cross-term
+    # between W̃ and C is what causes divergence.  Set False to match the paper.
+    freeze_comp: bool = True
 
 
 @dataclass
@@ -285,6 +295,49 @@ def evaluate(model, tokenizer, seq_pool, device, eval_batches, batch_size, seq_l
     return avg_loss, math.exp(avg_loss), sum(accs) / len(accs)
 
 
+from contextlib import contextmanager
+
+@contextmanager
+def specdef_fused_eval(model):
+    """Context manager: temporarily fuse SpecDef wrappers for accurate bf16 evaluation.
+
+    Inside the context, all SpecDefLinear wrappers are replaced with normal
+    bf16 nn.Linear using the fused weight C@W̃. On exit, wrappers are restored.
+    If the model has no SpecDefLinear layers, this is a no-op.
+    """
+    from scripts.lock_specdef import SpecDefLinear, _find_specdef_layers, _set_nested
+    import torch.nn as nn
+
+    # Find all SpecDefLinear wrappers
+    found = _find_specdef_layers(model)
+
+    if not found:
+        yield
+        return
+
+    saved = {}  # (idx, pattern) -> wrapper
+    # Fuse: replace wrappers with bf16 linear
+    with torch.no_grad():
+        for idx, pattern, wrapper in found:
+            saved[(idx, pattern)] = wrapper
+            fused_w = wrapper.comp.weight.data @ wrapper.linear.weight.data
+            d_out, d_in = wrapper.linear.weight.shape
+            has_bias = wrapper.bias is not None
+            fused = nn.Linear(d_in, d_out, bias=has_bias,
+                              dtype=torch.bfloat16, device=fused_w.device)
+            fused.weight.data = fused_w.bfloat16()
+            if has_bias:
+                fused.bias.data = wrapper.bias.data.bfloat16()
+            _set_nested(model.blocks[idx], pattern, fused)
+
+    try:
+        yield
+    finally:
+        # Restore wrappers
+        for (idx, pattern), wrapper in saved.items():
+            _set_nested(model.blocks[idx], pattern, wrapper)
+
+
 # ---------------------------------------------------------------------------
 # Target selection
 # ---------------------------------------------------------------------------
@@ -325,8 +378,15 @@ def get_block_params(model, target_blocks: set):
 
 
 def freeze_all_except(model, target_names_set: set):
+    frozen_count = 0
+    trainable_count = 0
     for name, param in model.named_parameters():
         param.requires_grad = name in target_names_set
+        if param.requires_grad:
+            trainable_count += 1
+        else:
+            frozen_count += 1
+    return frozen_count, trainable_count
 
 
 # ---------------------------------------------------------------------------
@@ -460,8 +520,62 @@ def maybe_load_locked_checkpoint(model, ckpt_path: str | None):
         raise FileNotFoundError(f"Locked checkpoint not found: {ckpt_path}")
     print(f"Loading locked checkpoint: {ckpt_path}")
     state_dict = torch.load(ckpt_path, map_location="cpu")
+
+    # Detect SpecDef checkpoint: look for compensation keys (.comp.weight)
+    specdef_keys = [k for k in state_dict if ".comp.weight" in k]
+    if specdef_keys:
+        print(f"  Detected SpecDef checkpoint ({len(specdef_keys)} compensation keys)")
+        _apply_specdef_checkpoint(model, state_dict, specdef_keys)
+    else:
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        print(f"  Missing keys: {len(missing)}, Unexpected keys: {len(unexpected)}")
+
+
+def _apply_specdef_checkpoint(model, state_dict: dict, specdef_keys: list[str]):
+    """Load a SpecDef checkpoint: replace target layers with SpecDefLinear wrappers."""
+    import re
+    from scripts.lock_specdef import SpecDefLinear, _get_nested, _set_nested
+
+    # Parse comp keys to find (block_idx, layer_pattern) pairs
+    # Keys look like: blocks.X.out_filter_dense.comp.weight
+    #             or: blocks.X.inner_mha_cls.out_proj.comp.weight
+    modified = []  # (block_idx, pattern)
+    for key in specdef_keys:
+        m = re.match(r"blocks\.(\d+)\.(.+)\.comp\.weight", key)
+        if m:
+            modified.append((int(m.group(1)), m.group(2)))
+
+    # Create SpecDefLinear wrappers
+    for idx, pattern in sorted(set(modified)):
+        block = model.blocks[idx]
+        prefix = f"blocks.{idx}.{pattern}"
+        w_key = f"{prefix}.linear.weight"
+        c_key = f"{prefix}.comp.weight"
+        b_key = f"{prefix}.bias"
+        W_tilde = state_dict[w_key]
+        C = state_dict[c_key]
+        orig_bias = state_dict.get(b_key, None)
+        d_out, d_in = W_tilde.shape
+
+        orig_layer = _get_nested(block, pattern)
+        device = orig_layer.weight.device if orig_layer is not None else "cpu"
+
+        inflated = torch.nn.Linear(d_in, d_out, bias=False,
+                                   dtype=torch.float32, device=device)
+        comp = torch.nn.Linear(d_out, d_out, bias=False,
+                               dtype=torch.float32, device=device)
+
+        if orig_bias is not None:
+            orig_bias = orig_bias.to(device)
+        _set_nested(block, pattern, SpecDefLinear(inflated, comp, bias=orig_bias))
+
+    # Now load full state dict
     missing, unexpected = model.load_state_dict(state_dict, strict=False)
-    print(f"  Missing keys: {len(missing)}, Unexpected keys: {len(unexpected)}")
+    print(f"  Loaded: Missing={len(missing)}, Unexpected={len(unexpected)}")
+    if unexpected:
+        print(f"  WARNING unexpected keys: {unexpected[:5]}")
+    patterns_used = sorted(set(p for _, p in modified))
+    print(f"  SpecDefLinear wrappers for {len(modified)} layers across patterns: {patterns_used}")
 
 
 def maybe_enable_gradient_checkpointing(model, enable: bool):
@@ -497,17 +611,17 @@ def maybe_enable_gradient_checkpointing(model, enable: bool):
 # Optimizer
 # ---------------------------------------------------------------------------
 
-def build_optimizer(model, name: str, lr: float):
+def build_optimizer(model, name: str, lr: float, weight_decay: float = 0.0):
     trainable = [p for p in model.parameters() if p.requires_grad]
     if name.lower() == "adamw":
-        return optim.AdamW(trainable, lr=lr, betas=(0.9, 0.999), weight_decay=0.0)
+        return optim.AdamW(trainable, lr=lr, betas=(0.9, 0.999), weight_decay=weight_decay)
     if name.lower() == "adafactor":
         from transformers.optimization import Adafactor
         return Adafactor(
             trainable, lr=lr,
             scale_parameter=False,
             relative_step=False,
-            weight_decay=0.0,
+            weight_decay=weight_decay,
         )
     if name.lower() == "sgd":
         return optim.SGD(trainable, lr=lr, momentum=0.9)

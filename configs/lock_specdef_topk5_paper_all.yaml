@@ -1,0 +1,13 @@
+# SpecDef locking — softer k variant: alpha=10k, top_k=5, all 32 layers
+# Purpose: inflate only the top 5 singular values instead of 25.
+# Hypothesis: fewer inflated directions = less distortion of representations,
+#             while still constraining the most attack-relevant subspace.
+run_name: lock_specdef_topk5_paper_all
+alpha: 10000.0
+top_k: 5
+target_blocks: 32
+num_target_layers: 0
+target_layer_patterns:
+  - out_filter_dense
+  - inner_mha_cls.out_proj
+retain_data_path: data/retain.fasta

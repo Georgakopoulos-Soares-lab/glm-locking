@@ -1,0 +1,42 @@
+# Direct SVD scaling lock — scale top-k singular values ×100, then 500-step retain recovery
+# PURPOSE: bypass the σ_max≈117 ceiling of gradient-based locking.
+# Directly inflates σ to ~4000 (assuming baseline ~40 × 100), then recovers fluency.
+# Compare attacker gap vs ft_attack_v11_strong_3k (+0.106) to see if stronger σ = stronger lock.
+
+run_name: lock_direct_scale_x100
+
+# --- Data ---
+retain_data_path: data/retain.fasta
+model_name: evo-1-8k-base
+seed: 42
+train_fraction: 0.9
+min_seq_len: 512
+
+# --- Direct scaling ---
+scale_factor: 100
+top_k: 5
+
+# --- Retain recovery (restore fluency after scaling, without undoing inflation) ---
+recover_steps: 500
+recover_lr: 1e-6
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 12
+val_every: 50
+val_batches: 8
+max_grad_norm: 1.0
+
+# ALL 32 blocks
+target_blocks: 32
+target_layer_patterns:
+  - .projections.weight
+  - .out_filter_dense.weight
+  - .inner_mha_cls.Wqkv.weight
+  - .inner_mha_cls.out_proj.weight
+  - .mlp.l1.weight
+  - .mlp.l2.weight
+  - .mlp.l3.weight
+
+freeze_non_targets: true
+save_checkpoint: true
+use_gradient_checkpointing: true

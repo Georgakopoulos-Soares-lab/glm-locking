@@ -1,0 +1,27 @@
+# Attack config — softer lock variant: alpha=1k, k=25, all 32 layers
+# Lock: results/lock_specdef_alpha1k/model_specdef.pt
+# Purpose: test whether reducing alpha (1k vs 10k) recovers model capability
+#          while still providing some attack resistance.
+mode: both
+run_name: ft_gentler_alpha1k
+
+locked_ckpt: results/lock_specdef_alpha1k/model_specdef.pt
+data_path: data/attack.fasta
+
+train_steps: 5000
+lr: 1e-5
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw
+weight_decay: 0.01
+warmup_fraction: 0.1
+
+target_blocks: 32
+freeze_comp: false
+freeze_filter_params: false
+use_gradient_checkpointing: true
+save_checkpoint: true

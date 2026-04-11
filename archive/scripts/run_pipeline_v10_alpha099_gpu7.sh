@@ -1,27 +1,26 @@
 #!/bin/bash
-# SpecDef pipeline v10 — lock → finetune (locked + unlocked).
-# 32 blocks, top_k=5, 10k lock steps + 20k finetune steps (H100-80GB).
+# SpecDef pipeline v10 — alpha=0.99 variant (paper value, fixed retain weight).
+# Same as run_pipeline_v10.sh but with alpha_start=alpha_end=0.99 per the paper's
+# text-classification experiments (Appendix B.2, locking.pdf).
+# Pinned to GPU 7 of the current node.
 #
 # Usage:
-#   sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh
-#   sbatch -p h100 --gres=gpu:1 -t 72:00:00 scripts/run_pipeline_v10.sh --skip-lock
-
-#SBATCH -J evo_v10
-#SBATCH -o logs/evo_v10.%j.out
-#SBATCH -e logs/evo_v10.%j.err
-#SBATCH -N 1
-#SBATCH --mem=200G
-#SBATCH -t 72:00:00
-#SBATCH -A BCS25105
+#   bash scripts/run_pipeline_v10_alpha099_gpu7.sh
+#   bash scripts/run_pipeline_v10_alpha099_gpu7.sh --skip-lock
 
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Configs (fixed — all 32 blocks)
+# Pin to GPU 7
 # ---------------------------------------------------------------------------
-LOCK_CONFIG="configs/lock_v10_full.yaml"
-FT_CONFIG="configs/ft_attack_v10_full.yaml"
-LOCKED_CKPT="results/lock_v10_full/model_locked.pt"
+export CUDA_VISIBLE_DEVICES=7
+
+# ---------------------------------------------------------------------------
+# Configs
+# ---------------------------------------------------------------------------
+LOCK_CONFIG="configs/lock_v10_full_alpha099.yaml"
+FT_CONFIG="configs/ft_attack_v10_full_alpha099.yaml"
+LOCKED_CKPT="results/lock_v10_full_alpha099/model_locked.pt"
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -44,14 +43,15 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
 mkdir -p logs
-LOG="logs/pipeline_v10_$(date +%Y%m%d_%H%M%S).log"
+LOG="logs/pipeline_v10_alpha099_gpu7_$(date +%Y%m%d_%H%M%S).log"
 exec > >(tee -a "$LOG") 2>&1
 
 echo "============================================================"
-echo " SpecDef Pipeline v10  [32 blocks, top_k=5]"
+echo " SpecDef Pipeline v10 — alpha=0.99 (paper value)  [GPU 7]"
 echo "   lock config: $LOCK_CONFIG"
 echo "   ft config:   $FT_CONFIG"
 echo "   locked ckpt: $LOCKED_CKPT"
+echo "   CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 echo "   $(date)  |  Project: $PROJECT_DIR"
 echo "============================================================"
 echo ""
@@ -59,14 +59,15 @@ echo ""
 # ---------------------------------------------------------------------------
 # Conda env
 # ---------------------------------------------------------------------------
-CONDA_ROOT="${CONDA_ROOT:-/work/10906/arisk/conda}"
-if [[ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]]; then
+CONDA_ROOT="/home/nvidia/miniconda3"
+if [ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]; then
     source "$CONDA_ROOT/etc/profile.d/conda.sh"
     conda activate evo
-elif [[ -f "$CONDA_ROOT/bin/activate" ]]; then
+elif [ -f "$CONDA_ROOT/bin/activate" ]; then
     source "$CONDA_ROOT/bin/activate" evo
 else
-    echo "[ERROR] Cannot find conda at $CONDA_ROOT" >&2; exit 1
+    echo "[ERROR] Could not find conda initialization at $CONDA_ROOT. Edit CONDA_ROOT in this script." >&2
+    exit 1
 fi
 
 export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
@@ -79,6 +80,12 @@ echo ""
 # ---------------------------------------------------------------------------
 # STAGE 1 — Lock
 # ---------------------------------------------------------------------------
+if [[ "$SKIP_LOCK" -eq 0 ]] && [[ -f "$LOCKED_CKPT" ]]; then
+    echo ">>> [STAGE 1] Locked checkpoint already exists — skipping lock"
+    echo "    Found: $LOCKED_CKPT"
+    SKIP_LOCK=1
+fi
+
 if [[ "$SKIP_LOCK" -eq 1 ]]; then
     echo ">>> [STAGE 1] Skipping lock (--skip-lock)"
     [[ -f "$LOCKED_CKPT" ]] || { echo "[ERROR] Checkpoint not found: $LOCKED_CKPT" >&2; exit 1; }
@@ -116,7 +123,7 @@ echo "============================================================"
 python -u - <<'PYEOF'
 import csv, os
 
-base = "ft_attack_v10_full"
+base = "ft_attack_v10_full_alpha099"
 
 def read_metrics(path):
     if not os.path.exists(path): return None, None
@@ -146,9 +153,4 @@ else:
     print("  [WARNING] Could not read one or both metrics files")
     if locked_final  is not None: print(f"  Locked:   final={locked_final:.4f}  best={locked_best:.4f}")
     if unlocked_final is not None: print(f"  Unlocked: final={unlocked_final:.4f}  best={unlocked_best:.4f}")
-
 PYEOF
-
-echo ""
-echo "Full log: $LOG"
-echo "Done."

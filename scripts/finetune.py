@@ -38,7 +38,9 @@ from src.utils import (
     causal_lm_loss,
     next_token_accuracy,
     evaluate,
+    specdef_fused_eval,
     get_block_params,
+    get_lock_targets,
     freeze_all_except,
     load_evo_model,
     maybe_load_locked_checkpoint,
@@ -48,6 +50,7 @@ from src.utils import (
     count_params,
     count_trainable,
     count_params_by_name,
+    compute_svd_stats,
 )
 
 # ===========================================================================
@@ -121,8 +124,9 @@ def _load_config(path: str, mode: str | None = None) -> list[FinetuneConfig]:
         val = d["target_blocks"]
         d["target_blocks"] = set(range(val)) if isinstance(val, int) else set(val)
     # YAML loads scientific notation as string (e.g. '5e-5') — cast to float
-    if "lr" in d:
-        d["lr"] = float(d["lr"])
+    for float_key in ("lr", "weight_decay", "warmup_fraction"):
+        if float_key in d:
+            d[float_key] = float(d[float_key])
 
     locked_ckpt = d.pop("locked_ckpt", None)
 
@@ -215,7 +219,64 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
     # --- Targets (all params in target blocks) ---
     target_names = get_block_params(model, cfg.target_blocks)
     target_names_set = set(target_names)
+
+    # Optionally freeze Hyena filter params (poles/residues/short_filter/D)
+    # to test whether they function as a bypass route around the spectral lock.
+    _FILTER_SUFFIXES = (
+        ".filter.poles",
+        ".filter.residues",
+        ".filter.short_filter_weight",
+        ".filter.short_filter_bias",
+        ".filter.D",
+    )
+    if cfg.freeze_filter_params:
+        before = len(target_names_set)
+        target_names_set = {
+            n for n in target_names_set
+            if not any(n.endswith(s) for s in _FILTER_SUFFIXES)
+        }
+        if is_main:
+            print(f"[freeze_filter_params=True] Removed {before - len(target_names_set)} "
+                  f"filter tensors from trainable set ({len(target_names_set)} remaining)")
+
+    # Optionally freeze SpecDef compensation matrices (C).
+    # Default (freeze_comp=True): C is frozen — original behaviour.
+    # Paper-faithful (freeze_comp=False): C is trainable — Hessian cross-term
+    # between W̃ and C causes divergence at high α.
+    _COMP_SUFFIXES = (".comp.weight",)
+    if cfg.freeze_comp:
+        before = len(target_names_set)
+        target_names_set = {
+            n for n in target_names_set
+            if not any(n.endswith(s) for s in _COMP_SUFFIXES)
+        }
+        n_frozen_comp = before - len(target_names_set)
+        if n_frozen_comp > 0 and is_main:
+            print(f"[SpecDef] Froze {n_frozen_comp} compensation matrices (C)")
+    else:
+        n_comp = sum(1 for n in target_names_set if any(n.endswith(s) for s in _COMP_SUFFIXES))
+        if n_comp > 0 and is_main:
+            print(f"[SpecDef] Keeping {n_comp} compensation matrices (C) TRAINABLE (paper-faithful)")
+
     frozen_count, trainable_count = freeze_all_except(model, target_names_set)
+
+    # Spectral monitoring: track the 7 locked linear-layer patterns specifically
+    # (same patterns used during locking — these are the matrices whose σ was inflated)
+    # For SpecDef models, out_filter_dense.weight becomes out_filter_dense.linear.weight
+    _LOCK_PATTERNS = (
+        ".projections.weight",
+        ".out_filter_dense.weight",
+        ".out_filter_dense.linear.weight",
+        ".inner_mha_cls.Wqkv.weight",
+        ".inner_mha_cls.out_proj.weight",
+        ".mlp.l1.weight",
+        ".mlp.l2.weight",
+        ".mlp.l3.weight",
+    )
+    spectral_names, spectral_params = get_lock_targets(model, cfg.target_blocks, _LOCK_PATTERNS)
+
+    # Snapshot initial weights for L2-norm-of-change tracking
+    init_weights = {n: p.data.detach().clone().cpu() for n, p in model.named_parameters() if n in target_names_set}
 
     # --- DDP wrap ---
     model, raw_model = wrap_ddp(model, local_rank)
@@ -231,8 +292,20 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
             print(f"DDP: {world_size} GPUs, effective_batch={cfg.batch_size * cfg.grad_accum_steps * world_size}")
 
     # --- Optimizer ---
-    optimizer = build_optimizer(raw_model, cfg.optimizer_name, cfg.lr)
+    optimizer = build_optimizer(raw_model, cfg.optimizer_name, cfg.lr,
+                                weight_decay=cfg.weight_decay)
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
+
+    # --- LR warmup scheduler (linear warmup, constant after) ---
+    warmup_steps = int(cfg.train_steps * cfg.warmup_fraction)
+    if warmup_steps > 0:
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return (step + 1) / warmup_steps
+            return 1.0
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    else:
+        scheduler = None
 
     tokens_seen = cfg.train_steps * cfg.batch_size * cfg.seq_len * cfg.grad_accum_steps * world_size
     coverage = tokens_seen / total_train_nt if total_train_nt > 0 else 0.0
@@ -272,17 +345,51 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
         else:
             torch.nn.utils.clip_grad_norm_(trainable_list, cfg.max_grad_norm)
             optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
         optimizer.zero_grad(set_to_none=True)
 
         if (step % cfg.val_every == 0 or step == cfg.train_steps - 1) and is_main:
-            train_loss, train_ppl, train_acc = evaluate(
-                raw_model, tokenizer, train_seqs, cfg.device,
-                cfg.eval_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
-            )
-            val_loss, val_ppl, val_acc = evaluate(
-                raw_model, tokenizer, val_seqs, cfg.device,
-                cfg.eval_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
-            )
+            # Fuse SpecDef wrappers for eval so locked and unlocked models
+            # both evaluate through the same bf16 computation path.
+            with specdef_fused_eval(raw_model):
+                if step == 0:
+                    from scripts.lock_specdef import SpecDefLinear as _SL, _find_specdef_layers
+                    _n = len(_find_specdef_layers(raw_model))
+                    print(f"  [DEBUG] step 0 fused eval: {_n} SpecDefLinear remaining "
+                          f"(should be 0)")
+                train_loss, train_ppl, train_acc = evaluate(
+                    raw_model, tokenizer, train_seqs, cfg.device,
+                    cfg.eval_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
+                )
+                val_loss, val_ppl, val_acc = evaluate(
+                    raw_model, tokenizer, val_seqs, cfg.device,
+                    cfg.eval_batches, cfg.batch_size, cfg.seq_len, amp_dtype,
+                )
+
+            # --- L2 norm of weight change (vs initial weights) ---
+            l2_total = 0.0
+            n_tensors = 0
+            with torch.no_grad():
+                for n, p in raw_model.named_parameters():
+                    if n in init_weights:
+                        diff = (p.data.cpu().float() - init_weights[n].float()).norm().item()
+                        l2_total += diff ** 2
+                        n_tensors += 1
+            l2_norm = (l2_total ** 0.5) if n_tensors > 0 else 0.0
+
+            # --- Sigma trajectory: mean and max of σ_1 across spectral target matrices ---
+            # Use a small sample (every 8th matrix) to keep it fast
+            sample_names = spectral_names[::8] if len(spectral_names) > 16 else spectral_names
+            sample_params = spectral_params[::8] if len(spectral_params) > 16 else spectral_params
+            sigma_vals = []
+            with torch.no_grad():
+                for sp in sample_params:
+                    q = 12  # enough for top-1 accuracy
+                    _, S, _ = torch.svd_lowrank(sp.data.detach().float(), q=q, niter=2)
+                    sigma_vals.append(float(S[0]))
+            sigma_mean = sum(sigma_vals) / len(sigma_vals) if sigma_vals else 0.0
+            sigma_max = max(sigma_vals) if sigma_vals else 0.0
 
             record = {
                 "step": step,
@@ -292,6 +399,9 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
                 "val_loss": round(val_loss, 4),
                 "val_ppl": round(val_ppl, 4),
                 "val_acc": round(val_acc, 4),
+                "l2_weight_change": round(l2_norm, 4),
+                "sigma_mean": round(sigma_mean, 4),
+                "sigma_max": round(sigma_max, 4),
             }
             history.append(record)
 
@@ -306,8 +416,15 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
                 f"Step {step:05d} | "
                 f"train_loss={record['train_loss']:.4f} | "
                 f"val_loss={record['val_loss']:.4f} | "
-                f"val_acc={record['val_acc']:.4f}{marker}"
+                f"val_acc={record['val_acc']:.4f} | "
+                f"l2={record['l2_weight_change']:.2f} | "
+                f"σ_mean={record['sigma_mean']:.1f} σ_max={record['sigma_max']:.1f}"
+                f"{marker}",
+                flush=True,
             )
+
+            # Incremental save — survives crashes
+            save_history_csv(history, os.path.join(cfg.results_dir, "metrics.csv"))
         
         # Barrier: ensure all ranks wait for rank 0 to finish validation/checkpointing
         if world_size > 1 and (step % cfg.val_every == 0 or step == cfg.train_steps - 1):

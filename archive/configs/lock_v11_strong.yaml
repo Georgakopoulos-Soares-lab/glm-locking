@@ -1,0 +1,51 @@
+# SpecDef lock — v11 strong (5000 steps, lr=1e-4, alpha 0.6→0.2)
+# Differences from lock_v10_full:
+#   - lock_steps: 5000  (was 2000 — spectral_term was still growing at step 1999)
+#   - lock_lr:    1e-4  (was 5e-5 — faster sigma_max inflation per step)
+#   - alpha_start: 0.6  (was 0.8 — more spectral weight from the start)
+#   - alpha_end:   0.2  (was 0.3 — pushes harder on spectral term at end)
+# save_checkpoint: true  — required so finetune can load model_locked.pt
+# results_dir auto-derived as results/{run_name}
+
+run_name: lock_v11_strong
+
+# --- Data ---
+retain_data_path: data/retain.fasta
+model_name: evo-1-8k-base
+seed: 42
+train_fraction: 0.9
+min_seq_len: 512
+
+# --- Lock hyperparameters ---
+lock_steps: 5000
+lock_lr: 1e-4
+alpha_start: 0.6
+alpha_end: 0.2
+top_k: 5
+
+freeze_non_targets: true
+
+# --- Compute ---
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 12
+use_gradient_checkpointing: true
+
+# --- Eval ---
+val_every: 100
+val_batches: 8
+max_grad_norm: 1.0
+optimizer_name: adafactor
+
+# ALL 32 blocks
+target_blocks: 32
+target_layer_patterns:
+  - .projections.weight
+  - .out_filter_dense.weight
+  - .inner_mha_cls.Wqkv.weight
+  - .inner_mha_cls.out_proj.weight
+  - .mlp.l1.weight
+  - .mlp.l2.weight
+  - .mlp.l3.weight
+
+save_checkpoint: true

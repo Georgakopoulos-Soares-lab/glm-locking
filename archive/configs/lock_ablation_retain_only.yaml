@@ -1,0 +1,51 @@
+# ABLATION: retain-only lock (alpha=1.0 always → spectral term coefficient = 0)
+# PURPOSE: isolate how much of the v11_strong gap is from spectral inflation
+#   vs. plain model degradation from 5000 steps of retain finetuning.
+# If the attacker gap on this checkpoint ≈ v11_strong gap → gap is just degradation.
+# If gap here < v11_strong gap → the difference is the true spectral lock effect.
+#
+# Identical to lock_v11_strong in all other respects (steps, lr, blocks, etc.)
+# coeff = (1 - alpha) = (1 - 1.0) = 0.0 → spectral grads are zeroed out in add_spectral_grads()
+
+run_name: lock_ablation_retain_only
+
+# --- Data ---
+retain_data_path: data/retain.fasta
+model_name: evo-1-8k-base
+seed: 42
+train_fraction: 0.9
+min_seq_len: 512
+
+# --- Lock hyperparameters ---
+lock_steps: 5000
+lock_lr: 1e-4
+alpha_start: 1.0
+alpha_end: 1.0
+top_k: 5
+
+freeze_non_targets: true
+
+# --- Compute ---
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 12
+use_gradient_checkpointing: true
+
+# --- Eval ---
+val_every: 100
+val_batches: 8
+max_grad_norm: 1.0
+optimizer_name: adafactor
+
+# ALL 32 blocks (same as v11_strong — fair comparison)
+target_blocks: 32
+target_layer_patterns:
+  - .projections.weight
+  - .out_filter_dense.weight
+  - .inner_mha_cls.Wqkv.weight
+  - .inner_mha_cls.out_proj.weight
+  - .mlp.l1.weight
+  - .mlp.l2.weight
+  - .mlp.l3.weight
+
+save_checkpoint: true

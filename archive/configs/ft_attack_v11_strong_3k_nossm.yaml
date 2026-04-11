@@ -1,0 +1,44 @@
+# Finetune attack — v11 strong lock, 3k steps, poles/residues/short_filter FROZEN
+# PURPOSE: test whether Hyena SSM filter params (poles, residues, short_filter) function
+#   as a bypass route around the spectral lock on weight matrices.
+#
+# COMPARISON:
+#   ft_attack_v11_strong_3k (filter unfrozen): gap +0.106
+#   This run (filter frozen):                  gap = ?
+#
+# If gap here > +0.106 → filter params were helping attacker bypass lock (real bypass)
+# If gap here ≈ +0.106 → filter params don't matter; gap is due to locked weight matrices
+#
+# Both locked and unlocked attackers have filter frozen, so comparison stays fair.
+
+mode: both
+run_name: ft_attack_v11_strong_3k_nossm
+
+# --- Data ---
+data_path: data/attack.fasta
+model_name: evo-1-8k-base
+seed: 42
+train_fraction: 0.9
+min_seq_len: 1024
+
+# --- Training ---
+train_steps: 3000
+lr: 1e-5
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 50
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adafactor
+
+# ALL 32 blocks
+target_blocks: 32
+
+locked_ckpt: results/lock_v11_strong/model_locked.pt
+
+# KEY: freeze poles, residues, short_filter_weight/bias, D during attack
+freeze_filter_params: true
+
+save_checkpoint: false
+use_gradient_checkpointing: true

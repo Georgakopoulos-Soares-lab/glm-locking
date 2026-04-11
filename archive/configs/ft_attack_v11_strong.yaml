@@ -1,0 +1,39 @@
+# Finetune attack — v11 strong (uses lock_v11_strong checkpoint)
+#
+# save_checkpoint: false — skips model_best.pt + model_finetuned.pt (~26GB saved per run)
+# If results look good, rerun with save_checkpoint: true to keep the final model.
+#
+# mode: 'both' → runs locked then unlocked sequentially
+# results_dir auto-derived:
+#   locked   → results/ft_attack_v11_strong_locked/
+#   unlocked → results/ft_attack_v11_strong_unlocked/
+
+mode: both
+run_name: ft_attack_v11_strong
+
+# --- Data ---
+data_path: data/attack.fasta
+model_name: evo-1-8k-base
+seed: 42
+train_fraction: 0.9
+min_seq_len: 1024
+
+# --- Training ---
+train_steps: 1500
+lr: 1e-5
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 50
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adafactor
+
+# ALL 32 blocks (must match lock config)
+target_blocks: 32
+
+# Locked checkpoint path (must match lock_v11_strong output)
+locked_ckpt: results/lock_v11_strong/model_locked.pt
+
+save_checkpoint: false
+use_gradient_checkpointing: true

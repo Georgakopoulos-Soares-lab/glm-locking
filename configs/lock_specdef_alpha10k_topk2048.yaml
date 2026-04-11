@@ -1,0 +1,6 @@
+# SpecDef exact locking — alpha=10000, top_k=2048 (half of 4096 dims locked)
+run_name: lock_specdef_alpha10k_topk2048
+alpha: 10000.0
+top_k: 2048
+target_blocks: 32
+retain_data_path: data/retain.fasta

@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 0) Load the cluster's CUDA runtime (required BEFORE installing torch cu128)
-module load cuda/12.8
-
 # 1) Fresh conda env
 conda create -n evo python=3.10 -y
 
