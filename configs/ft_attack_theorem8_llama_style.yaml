@@ -1,0 +1,31 @@
+# Theorem 8 proper SVD-factorization attack against llama_style lock.
+# Replaces each SpecDefLinear with k=2 jointly-trainable SVD factors of W̃.
+# α≈36k for llama_style; k=2 reduces per-factor σ₁ from 36k → ≈190 (tractable).
+# C stays frozen (freeze_comp: true). Compare with:
+#   ft_attack_specdef_llama_style_lr1e5 — direct attack (W̃ trainable, C frozen)
+#   ft_bypass_specdef_llama_style       — output bypass B (W̃ + C frozen)
+mode: locked
+run_name: ft_attack_theorem8_llama_style
+locked_ckpt: results/lock_specdef_llama_style/model_specdef.pt
+
+theorem8_injection: true
+theorem8_k: 2
+freeze_comp: true
+
+lr: 1.0e-5
+train_steps: 5000
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+
+data_path: data/attack.fasta
+train_fraction: 0.9
+seed: 42
+
+target_blocks: 32
+save_checkpoint: true
+use_gradient_checkpointing: true

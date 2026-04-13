@@ -45,6 +45,8 @@ from src.utils import (
     load_evo_model,
     maybe_load_locked_checkpoint,
     maybe_enable_gradient_checkpointing,
+    inject_bypass_layers,
+    inject_theorem8_layers,
     build_optimizer,
     save_history_csv,
     count_params,
@@ -214,6 +216,24 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
     # --- Model ---
     model, tokenizer = load_evo_model(cfg.model_name, cfg.device)
     maybe_load_locked_checkpoint(model, cfg.locked_ckpt)
+
+    # Theorem 8 layer-injection bypass: wrap every SpecDefLinear with a
+    # trainable bypass matrix B (identity init).  Must run immediately after
+    # checkpoint load so the BypassSpecDefLinear replaces the SpecDefLinear
+    # before freeze_all_except scans the parameter tree.
+    if cfg.layer_injection:
+        n_injected = inject_bypass_layers(model)
+        if is_main:
+            print(f"[layer_injection] {n_injected} bypass matrices injected")
+
+    # Proper Theorem 8 SVD-factorization attack: replace each SpecDefLinear with k
+    # jointly-trainable SVD factors of W̃, each with σ₁ = α^(1/k).  Must run BEFORE
+    # get_block_params so the new .factors.*.weight names are captured.
+    if cfg.theorem8_injection:
+        n_t8 = inject_theorem8_layers(model, k=cfg.theorem8_k)
+        if is_main:
+            print(f"[theorem8_injection] {n_t8} layers replaced with k={cfg.theorem8_k} SVD factors")
+
     maybe_enable_gradient_checkpointing(model, cfg.use_gradient_checkpointing)
 
     # --- Targets (all params in target blocks) ---
@@ -239,11 +259,29 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
             print(f"[freeze_filter_params=True] Removed {before - len(target_names_set)} "
                   f"filter tensors from trainable set ({len(target_names_set)} remaining)")
 
+    # Theorem 8 layer injection: also freeze W̃ (linear.weight inside SpecDefLinear)
+    # so that ONLY the injected bypass B trains.  The BypassSpecDefLinear forward
+    # already wraps the specdef path in torch.no_grad(), but we also remove it from
+    # target_names_set so freeze_all_except sets requires_grad=False.
+    _LINEAR_SUFFIXES = (".specdef.linear.weight",)
+    if cfg.layer_injection:
+        before = len(target_names_set)
+        target_names_set = {
+            n for n in target_names_set
+            if not any(n.endswith(s) for s in _LINEAR_SUFFIXES)
+        }
+        # Add bypass weights (these live under .bypass.weight inside BypassSpecDefLinear)
+        bypass_names = {n for n, _ in model.named_parameters() if n.endswith(".bypass.weight")}
+        target_names_set |= bypass_names
+        if is_main:
+            print(f"[layer_injection] Froze {before - len(target_names_set) + len(bypass_names)} W̃ params, "
+                  f"added {len(bypass_names)} bypass params to trainable set")
+
     # Optionally freeze SpecDef compensation matrices (C).
     # Default (freeze_comp=True): C is frozen — original behaviour.
     # Paper-faithful (freeze_comp=False): C is trainable — Hessian cross-term
     # between W̃ and C causes divergence at high α.
-    _COMP_SUFFIXES = (".comp.weight",)
+    _COMP_SUFFIXES = (".comp.weight", ".specdef.comp.weight")
     if cfg.freeze_comp:
         before = len(target_names_set)
         target_names_set = {
@@ -253,6 +291,15 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
         n_frozen_comp = before - len(target_names_set)
         if n_frozen_comp > 0 and is_main:
             print(f"[SpecDef] Froze {n_frozen_comp} compensation matrices (C)")
+        # Convert all C matrices to bf16 to save GPU memory (frozen, no gradient needed)
+        # Must run before freeze_all_except (params still have requires_grad here)
+        n_cast = 0
+        for name, param in model.named_parameters():
+            if any(name.endswith(s) for s in _COMP_SUFFIXES):
+                param.data = param.data.to(torch.bfloat16)
+                n_cast += 1
+        if n_cast > 0 and is_main:
+            print(f"[SpecDef] Converted {n_cast} C matrices to bf16 (saves ~{n_cast * 256}MB GPU memory)")
     else:
         n_comp = sum(1 for n in target_names_set if any(n.endswith(s) for s in _COMP_SUFFIXES))
         if n_comp > 0 and is_main:
@@ -348,7 +395,6 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
         if scheduler is not None:
             scheduler.step()
         optimizer.zero_grad(set_to_none=True)
-
         if (step % cfg.val_every == 0 or step == cfg.train_steps - 1) and is_main:
             # Fuse SpecDef wrappers for eval so locked and unlocked models
             # both evaluate through the same bf16 computation path.

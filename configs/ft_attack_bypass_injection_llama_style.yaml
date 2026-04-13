@@ -1,0 +1,33 @@
+# Theorem 8 layer-injection bypass attack against llama_style lock (64 layers).
+# Wraps every SpecDefLinear with BypassSpecDefLinear: a trainable bypass matrix B
+# (identity init, d_out x d_out, bf16) placed AFTER the frozen C(W~(x)) path.
+# Gradient only flows through B — never through the inflated C matrix.
+#
+# What trains: B matrices + all non-locked model params.
+# What is frozen: W~ (.linear.weight), C (.comp.weight), everything else outside target_blocks.
+#
+# Comparison target: ft_attack_specdef_llama_style_lr1e5 (same setup, no bypass)
+mode: locked
+run_name: ft_attack_bypass_injection_llama_style
+locked_ckpt: results/lock_specdef_llama_style/model_specdef.pt
+
+layer_injection: true
+freeze_comp: true
+
+lr: 1.0e-5
+train_steps: 5000
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+
+data_path: data/attack.fasta
+train_fraction: 0.9
+seed: 42
+
+target_blocks: 32
+save_checkpoint: true
+use_gradient_checkpointing: true

@@ -1,0 +1,25 @@
+# Fusion bypass attack: fine-tune on the fused C@W̃ → W model
+# The fused model is bit-identical to pretrained — this tests whether
+# an attacker who fuses the locked checkpoint can then fine-tune freely.
+# Expected outcome: identical to unlocked baseline (lock fully bypassed).
+mode: locked
+run_name: ft_attack_fused_bypass_lr1e5
+locked_ckpt: results/model_fused_bypass/model_fused.pt
+
+lr: 1.0e-5
+train_steps: 5000
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+
+data_path: data/attack.fasta
+train_fraction: 0.9
+seed: 42
+
+target_blocks: 32
+save_checkpoint: true
+use_gradient_checkpointing: true

@@ -93,6 +93,17 @@ class FinetuneConfig:
     # The paper (Rosati et al., 2026) keeps C trainable — the Hessian cross-term
     # between W̃ and C is what causes divergence.  Set False to match the paper.
     freeze_comp: bool = True
+    # Theorem 8 layer-injection bypass (black-box attacker).
+    # Wraps every SpecDefLinear with a trainable bypass matrix B (identity init).
+    # The locked W̃ and C are fully frozen; only B and non-locked model params train.
+    # One injected layer per locked layer = linear model size increase.
+    layer_injection: bool = False
+    # Proper Theorem 8 SVD-factorization attack (white-box).
+    # Replaces each SpecDefLinear with k jointly-trainable SVD factors of W̃,
+    # each initialized to σ₁ = α^(1/k). C stays frozen. Must also set freeze_comp: true.
+    # k=2 and α=10k → σ per factor ≈ 100 (tractable).
+    theorem8_injection: bool = False
+    theorem8_k: int = 2
 
 
 @dataclass
@@ -320,7 +331,7 @@ def specdef_fused_eval(model):
     with torch.no_grad():
         for idx, pattern, wrapper in found:
             saved[(idx, pattern)] = wrapper
-            fused_w = wrapper.comp.weight.data @ wrapper.linear.weight.data
+            fused_w = wrapper.comp.weight.data.float() @ wrapper.linear.weight.data
             d_out, d_in = wrapper.linear.weight.shape
             has_bias = wrapper.bias is not None
             fused = nn.Linear(d_in, d_out, bias=has_bias,
@@ -578,6 +589,56 @@ def _apply_specdef_checkpoint(model, state_dict: dict, specdef_keys: list[str]):
     print(f"  SpecDefLinear wrappers for {len(modified)} layers across patterns: {patterns_used}")
 
 
+def inject_bypass_layers(model):
+    """Theorem 8 layer injection: wrap every SpecDefLinear with a BypassSpecDefLinear.
+
+    Replaces each frozen SpecDefLinear with a BypassSpecDefLinear that adds a
+    trainable identity-initialized bypass matrix B after the frozen C(W̃(x)).
+    Gradients only flow through B — never through the inflated C matrix.
+
+    This is the black-box attacker construction from Rosati et al. (2026) Theorem 8.
+    One injected layer per locked layer = linear model size increase.
+
+    Returns number of layers injected.
+    """
+    from scripts.lock_specdef import SpecDefLinear, BypassSpecDefLinear, _find_specdef_layers, _set_nested
+
+    found = _find_specdef_layers(model)
+    if not found:
+        print("[inject_bypass_layers] No SpecDefLinear layers found — nothing to inject")
+        return 0
+
+    for idx, pattern, wrapper in found:
+        bypass = BypassSpecDefLinear(wrapper)
+        _set_nested(model.blocks[idx], pattern, bypass)
+
+    print(f"[inject_bypass_layers] Injected {len(found)} bypass layers (Theorem 8)")
+    return len(found)
+
+
+def inject_theorem8_layers(model, k: int = 2):
+    """Proper Theorem 8 SVD-factorization attack: replace each SpecDefLinear with k
+    jointly-trainable factors of W̃, each with σ₁ = (σ₁(W̃))^(1/k) ≈ α^(1/k).
+
+    For k=2 with α=10k: σ per factor ≈ 100 (tractable).  C stays frozen.
+    Must call BEFORE get_block_params() so new param names (.factors.*.weight) are seen.
+    """
+    from scripts.lock_specdef import SpecDefLinear, Theorem8SpecDefLinear, _find_specdef_layers, _set_nested
+
+    found = _find_specdef_layers(model)
+    if not found:
+        print("[inject_theorem8_layers] No SpecDefLinear layers found — nothing to inject")
+        return 0
+
+    for idx, pattern, wrapper in found:
+        t8 = Theorem8SpecDefLinear(wrapper, k=k)
+        _set_nested(model.blocks[idx], pattern, t8)
+
+    print(f"[inject_theorem8_layers] Replaced {len(found)} SpecDefLinear layers with "
+          f"Theorem8SpecDefLinear(k={k})")
+    return len(found)
+
+
 def maybe_enable_gradient_checkpointing(model, enable: bool):
     if not enable:
         return
@@ -615,6 +676,9 @@ def build_optimizer(model, name: str, lr: float, weight_decay: float = 0.0):
     trainable = [p for p in model.parameters() if p.requires_grad]
     if name.lower() == "adamw":
         return optim.AdamW(trainable, lr=lr, betas=(0.9, 0.999), weight_decay=weight_decay)
+    if name.lower() in ("adamw8bit", "adamw_8bit"):
+        import bitsandbytes as bnb
+        return bnb.optim.AdamW8bit(trainable, lr=lr, betas=(0.9, 0.999), weight_decay=weight_decay)
     if name.lower() == "adafactor":
         from transformers.optimization import Adafactor
         return Adafactor(

@@ -72,8 +72,175 @@ class SpecDefLinear(nn.Module):
             self.bias = None
 
     def forward(self, x):
+        import torch.nn.functional as _F
         with torch.autocast(device_type="cuda", enabled=False):
-            out = self.comp(self.linear(x.float()))
+            h = self.linear(x.float())
+            # comp.weight may be stored as bf16 to save GPU memory (frozen)
+            c_w = self.comp.weight
+            out = _F.linear(h, c_w.float() if c_w.dtype != torch.float32 else c_w, None)
+            if self.bias is not None:
+                out = out + self.bias
+        return out.to(x.dtype)
+
+
+class BypassSpecDefLinear(nn.Module):
+    """Theorem 8 layer-injection bypass wrapper.
+
+    Wraps a frozen SpecDefLinear with a trainable bypass matrix B (d_out × d_out),
+    initialized to identity. Forward pass:
+
+        h   = C(W̃(x))       [frozen SpecDefLinear — no gradients flow through C]
+        out = B(h)           [trainable — gradients only through B]
+
+    This is the black-box attacker construction from Rosati et al. Theorem 8:
+    one injected layer per locked layer, linear model-size increase.  The bypass
+    routes gradient around the inflated C matrix, making stable fine-tuning
+    possible regardless of α.
+    """
+    def __init__(self, specdef_layer: SpecDefLinear):
+        super().__init__()
+        self.specdef = specdef_layer          # frozen — W̃ and C
+        d_out = specdef_layer.linear.weight.shape[0]
+        device = specdef_layer.linear.weight.device
+        # Identity init: B = I  =>  B(h) = h at step 0 (same output as locked model)
+        self.bypass = nn.Linear(d_out, d_out, bias=False, device=device,
+                                dtype=torch.bfloat16)
+        nn.init.eye_(self.bypass.weight.float())
+        self.bypass.weight.data = self.bypass.weight.data.bfloat16()
+
+    def forward(self, x):
+        with torch.no_grad():
+            h = self.specdef(x)          # frozen path — no grad through C/W̃
+        return self.bypass(h.to(self.bypass.weight.dtype)).to(x.dtype)
+
+
+class _Theorem8Forward(torch.autograd.Function):
+    """Single-op autograd node: out = C( (L2 @ L1)(x) ) in float64 precision.
+
+    Wraps the entire W_eff = L2@L1 computation + two linear layers as ONE
+    autograd node, guaranteeing gradient checkpointing safety: `save_for_backward`
+    always saves the same 4 tensors (x, l1_w, l2_w, c_w) regardless of caching.
+
+    Float64 for W_eff (forward precision), float32 for backward (sufficient for grads).
+    k=2 only.
+    """
+    @staticmethod
+    def forward(ctx, x, l1_w, l2_w, c_w, bias):
+        w_eff = (l2_w.double() @ l1_w.double()).float()   # float64 → float32
+        h = torch.nn.functional.linear(x.float(), w_eff, None)
+        c = c_w.float()
+        out = torch.nn.functional.linear(h, c, None)
+        if bias is not None:
+            out = out + bias.float()
+        ctx.save_for_backward(x, l1_w, l2_w, c_w)
+        return out.to(x.dtype)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        x, l1_w, l2_w, c_w = ctx.saved_tensors
+        g = grad_output.float()
+        l1 = l1_w.float()
+        l2 = l2_w.float()
+        c = c_w.float()
+
+        # Backward through C: out = h @ c.T  →  dL/dh = g @ c
+        grad_h = g @ c                                         # (..., d_rank)
+
+        # Backward through W_eff = l2 @ l1: h = x @ W_eff.T
+        # dL/dx = dL/dh @ W_eff
+        w_eff_f32 = l2 @ l1                                    # float32 for backward
+        grad_x = (grad_h @ w_eff_f32).to(x.dtype) if x.requires_grad else None
+
+        # Weight gradients: dL/dW_eff = dL/dh^T @ x  (standard linear backward)
+        g_flat = grad_h.reshape(-1, grad_h.shape[-1])          # (N, d_rank)
+        x_flat = x.float().reshape(-1, x.shape[-1])            # (N, d_in)
+        grad_W_eff = g_flat.T @ x_flat                         # (d_rank, d_in)
+
+        # Chain to l1, l2: W_eff = l2 @ l1
+        grad_l1 = (l2.T @ grad_W_eff).to(l1_w.dtype)          # (d_rank, d_in)
+        grad_l2 = (grad_W_eff @ l1.T).to(l2_w.dtype)          # (d_out, d_rank)
+
+        return grad_x, grad_l1, grad_l2, None, None            # None: c_w frozen, bias frozen
+
+
+class Theorem8SpecDefLinear(nn.Module):
+    """Theorem 8 SVD-factorization attack (white-box, proper implementation).
+
+    Replaces SpecDefLinear(W̃, C) with k jointly-trainable factor layers
+    initialized via SVD of W̃ so that each factor has σ₁ = (σ₁(W̃))^(1/k) ≈ α^(1/k).
+
+    For k=2 (default):
+        W̃ = L2 @ L1        where σ₁(L1) = σ₁(L2) = √α
+        forward: out = C( L2( L1(x) ) )
+        C is frozen; L1 and L2 are jointly trainable.
+
+    At init, L2 @ L1 = W̃ exactly (float64 SVD precision), so functional identity
+    is preserved and step-0 loss matches the locked model baseline (val_loss ~2.0).
+
+    Uses _Theorem8Forward custom autograd function for gradient-checkpointing safety:
+    always saves identical tensors (x, l1_w, l2_w, c_w) regardless of context.
+    Float64 product W_eff = L2@L1 in forward for precision; float32 backward.
+    """
+    def __init__(self, specdef_layer: SpecDefLinear, k: int = 2):
+        super().__init__()
+        self.comp = specdef_layer.comp   # C — frozen
+        self.bias = specdef_layer.bias
+        self.k = k
+
+        W = specdef_layer.linear.weight.data.float()  # W̃ shape (d_out, d_in)
+        d_out, d_in = W.shape
+        device = specdef_layer.linear.weight.device
+
+        U, S, Vh = torch.linalg.svd(W, full_matrices=False)
+        r = S.shape[0]
+        S_pow = S.pow(1.0 / k)
+
+        factors = nn.ModuleList()
+        if k == 2:
+            l1 = nn.Linear(d_in, r, bias=False, device=device)
+            l2 = nn.Linear(r, d_out, bias=False, device=device)
+            l1.weight.data = (S_pow.unsqueeze(1) * Vh)          # float32
+            l2.weight.data = (U * S_pow.unsqueeze(0))            # float32
+            factors.extend([l1, l2])
+        else:
+            l1 = nn.Linear(d_in, r, bias=False, device=device)
+            l1.weight.data = S_pow.unsqueeze(1) * Vh
+            factors.append(l1)
+            for _ in range(k - 2):
+                lm = nn.Linear(r, r, bias=False, device=device)
+                lm.weight.data = torch.diag(S_pow)
+                factors.append(lm)
+            lk = nn.Linear(r, d_out, bias=False, device=device)
+            lk.weight.data = U * S_pow.unsqueeze(0)
+            factors.append(lk)
+
+        self.factors = factors
+        print(f"  [Theorem8] k={k}: d_out={d_out} d_in={d_in} r={r} "
+              f"σ_max(W̃)={float(S.max()):.1f} → σ_max/factor={float(S_pow.max()):.1f}")
+
+    def forward(self, x):
+        if self.k == 2:
+            # Fast path: custom autograd function — GC-safe, float64 W_eff precision.
+            bias_t = self.bias if self.bias is not None else torch.zeros(
+                1, device=x.device, dtype=torch.float32)
+            has_bias = self.bias is not None
+            bias_arg = self.bias if has_bias else None
+            return _Theorem8Forward.apply(
+                x,
+                self.factors[0].weight,
+                self.factors[1].weight,
+                self.comp.weight,
+                bias_arg,
+            )
+        # General k path (not gradient-checkpointing optimised — k=2 is used in practice)
+        import torch.nn.functional as _F
+        with torch.autocast(device_type="cuda", enabled=False):
+            w = self.factors[0].weight.double()
+            for fac in self.factors[1:]:
+                w = fac.weight.double() @ w
+            h = _F.linear(x.float(), w.float(), None)
+            c_w = self.comp.weight
+            out = _F.linear(h, c_w.float() if c_w.dtype != torch.float32 else c_w, None)
             if self.bias is not None:
                 out = out + self.bias
         return out.to(x.dtype)
@@ -173,8 +340,10 @@ def specdef_inflate_with_compensation(
         C: compensation matrix [m, m]  (float32)
         stats: dict with pre/post singular value info
     """
-    assert weight.shape[0] == weight.shape[1], \
-        f"SpecDef compensation requires square matrix, got {weight.shape}"
+    # Supports both square and non-square matrices.
+    # For W ∈ R^{m×n}: thin SVD gives U (m×r), S (r,), Vh (r×n) where r=min(m,n).
+    # Compensation C = U diag(S/S̃) Uᵀ is always square (m×m).
+    # Identity: C @ W̃ = U(S/S̃)Uᵀ · U S̃ Vᵀ = U S Vᵀ = W  ✓
 
     w = weight.double()
 
@@ -233,9 +402,6 @@ def apply_specdef_to_model(model, cfg: SpecDefConfig) -> dict:
             if not hasattr(layer, 'weight'):
                 continue
             w = layer.weight.data
-            if w.shape[0] != w.shape[1]:
-                print(f"  Block {block_idx}.{pattern}: SKIP (non-square {list(w.shape)})")
-                continue
             candidates.append((block_idx, pattern))
 
     print(f"  Found {len(candidates)} candidate layers for SpecDef")
@@ -285,18 +451,16 @@ def apply_specdef_to_model(model, cfg: SpecDefConfig) -> dict:
 
 
 def _find_specdef_layers(model):
-    """Find all SpecDefLinear wrappers in the model.
+    """Find all SpecDefLinear wrappers in the model by recursive traversal.
 
     Returns list of (block_idx, dotted_path, wrapper) tuples.
-    Searches common layer patterns in each block.
+    Works for any pattern — no hardcoded list required.
     """
-    _PATTERNS = ("out_filter_dense", "inner_mha_cls.out_proj")
     results = []
     for idx, block in enumerate(model.blocks):
-        for pattern in _PATTERNS:
-            layer = _get_nested(block, pattern)
-            if isinstance(layer, SpecDefLinear):
-                results.append((idx, pattern, layer))
+        for name, module in block.named_modules():
+            if name and isinstance(module, SpecDefLinear):
+                results.append((idx, name, module))
     return results
 
 
