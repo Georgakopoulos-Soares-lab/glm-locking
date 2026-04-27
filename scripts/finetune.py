@@ -16,6 +16,7 @@ Usage:
 
 import os
 import sys
+import time
 import argparse
 from contextlib import nullcontext
 
@@ -60,6 +61,7 @@ from src.utils import (
 # ===========================================================================
 _SHARED = dict(
     data_path="data/attack.fasta",
+    val_data_path=None,  # if set, use as val (held-out); train_fraction then ignored for val split
     model_name="evo-1-8k-base",
     device="cuda:0",
     seed=42,
@@ -126,7 +128,7 @@ def _load_config(path: str, mode: str | None = None) -> list[FinetuneConfig]:
         val = d["target_blocks"]
         d["target_blocks"] = set(range(val)) if isinstance(val, int) else set(val)
     # YAML loads scientific notation as string (e.g. '5e-5') — cast to float
-    for float_key in ("lr", "weight_decay", "warmup_fraction"):
+    for float_key in ("lr", "weight_decay", "warmup_fraction", "theorem8_factor_lr"):
         if float_key in d:
             d[float_key] = float(d[float_key])
 
@@ -205,7 +207,13 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
     if is_main:
         print("Loading attack data...")
     sequences = load_sequences(cfg.data_path, cfg.min_seq_len)
-    train_seqs, val_seqs = split_sequences(sequences, cfg.train_fraction)
+    if getattr(cfg, "val_data_path", None):
+        train_seqs = sequences
+        val_seqs = load_sequences(cfg.val_data_path, cfg.min_seq_len)
+        print(f"  Held-out val: {len(train_seqs)} train (from {cfg.data_path}) / "
+              f"{len(val_seqs)} val (from {cfg.val_data_path})", flush=True)
+    else:
+        train_seqs, val_seqs = split_sequences(sequences, cfg.train_fraction)
     total_train_nt = sum(len(s) for s in train_seqs)
     if is_main:
         print(f"  {len(sequences)} sequences -> {len(train_seqs)} train / {len(val_seqs)} val")
@@ -293,9 +301,12 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
             print(f"[SpecDef] Froze {n_frozen_comp} compensation matrices (C)")
         # Convert all C matrices to bf16 to save GPU memory (frozen, no gradient needed)
         # Must run before freeze_all_except (params still have requires_grad here)
+        # Skip if comp is float64 (rebuild_specdef_f64 — preserve precision).
         n_cast = 0
         for name, param in model.named_parameters():
             if any(name.endswith(s) for s in _COMP_SUFFIXES):
+                if param.dtype == torch.float64:
+                    continue   # keep f64 for high-precision zero-shot equivalence
                 param.data = param.data.to(torch.bfloat16)
                 n_cast += 1
         if n_cast > 0 and is_main:
@@ -304,6 +315,44 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
         n_comp = sum(1 for n in target_names_set if any(n.endswith(s) for s in _COMP_SUFFIXES))
         if n_comp > 0 and is_main:
             print(f"[SpecDef] Keeping {n_comp} compensation matrices (C) TRAINABLE (paper-faithful)")
+
+    # Optionally freeze inflated W̃ (comp-only ablation: only C learns to undo the lock).
+    _INFLATED_SUFFIXES = (".linear.weight",)
+    if getattr(cfg, "freeze_inflated", False):
+        before = len(target_names_set)
+        target_names_set = {
+            n for n in target_names_set
+            # Only filter SpecDef wrapped layers' inflated linear (block.X.pat.linear.weight)
+            if not (any(n.endswith(s) for s in _INFLATED_SUFFIXES) and (".comp." not in n) and ".specdef" in n.replace(".comp.", "."))
+        }
+        # Simpler: walk modules and freeze any SpecDefLinear.linear params
+        try:
+            from scripts.lock_specdef import SpecDefLinear
+            n_frozen_inf = 0
+            for mod in model.modules():
+                if isinstance(mod, SpecDefLinear):
+                    for p in mod.linear.parameters():
+                        p.requires_grad = False
+                        n_frozen_inf += 1
+            if is_main:
+                print(f"[freeze_inflated] Froze {n_frozen_inf} inflated W̃ params; only C trains.")
+        except Exception as e:
+            if is_main: print(f"[freeze_inflated] WARN: {e}")
+
+    # ---- LoRA injection (must come AFTER any freeze_* steps so we know the base) ----
+    if getattr(cfg, "use_lora", False):
+        from src.lora import inject_lora
+        n_wrapped, lora_names = inject_lora(
+            model,
+            rank=cfg.lora_rank,
+            alpha=cfg.lora_alpha,
+            target_substrings=tuple(cfg.lora_target_substrings),
+        )
+        if is_main:
+            print(f"[LoRA] Wrapped {n_wrapped} Linear modules; "
+                  f"{len(lora_names)} LoRA params (rank={cfg.lora_rank}, alpha={cfg.lora_alpha})")
+        # Override target set: only LoRA params train; everything else frozen.
+        target_names_set = set(lora_names)
 
     frozen_count, trainable_count = freeze_all_except(model, target_names_set)
 
@@ -339,16 +388,49 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
             print(f"DDP: {world_size} GPUs, effective_batch={cfg.batch_size * cfg.grad_accum_steps * world_size}")
 
     # --- Optimizer ---
-    optimizer = build_optimizer(raw_model, cfg.optimizer_name, cfg.lr,
-                                weight_decay=cfg.weight_decay)
+    if cfg.theorem8_injection and cfg.theorem8_factor_lr > 0:
+        # Per-param-group lr: lower lr for SVD factor params to prevent NaN
+        factor_params = []
+        other_params = []
+        for n, p in raw_model.named_parameters():
+            if p.requires_grad:
+                if ".factors." in n:
+                    factor_params.append(p)
+                else:
+                    other_params.append(p)
+        param_groups = [
+            {"params": other_params, "lr": cfg.lr},
+            {"params": factor_params, "lr": cfg.theorem8_factor_lr},
+        ]
+        if cfg.optimizer_name.lower() in ("adamw8bit", "adamw_8bit"):
+            import bitsandbytes as bnb
+            optimizer = bnb.optim.AdamW8bit(
+                param_groups, betas=(0.9, 0.999), weight_decay=cfg.weight_decay)
+        else:
+            optimizer = torch.optim.AdamW(
+                param_groups, betas=(0.9, 0.999), weight_decay=cfg.weight_decay)
+        if is_main:
+            print(f"[Theorem8] Per-param-group lr: factors={cfg.theorem8_factor_lr}, "
+                  f"rest={cfg.lr} ({len(factor_params)} factor, {len(other_params)} other)")
+    else:
+        optimizer = build_optimizer(raw_model, cfg.optimizer_name, cfg.lr,
+                                    weight_decay=cfg.weight_decay)
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
 
-    # --- LR warmup scheduler (linear warmup, constant after) ---
+    # --- LR scheduler: linear warmup then constant or cosine decay ---
     warmup_steps = int(cfg.train_steps * cfg.warmup_fraction)
-    if warmup_steps > 0:
+    schedule = getattr(cfg, "lr_schedule", "constant")
+    if warmup_steps > 0 or schedule == "cosine":
+        import math as _math
+        total = max(cfg.train_steps, 1)
         def lr_lambda(step):
-            if step < warmup_steps:
+            if warmup_steps > 0 and step < warmup_steps:
                 return (step + 1) / warmup_steps
+            if schedule == "cosine":
+                # decay from 1.0 -> 0.0 over (total - warmup_steps)
+                progress = (step - warmup_steps) / max(total - warmup_steps, 1)
+                progress = min(max(progress, 0.0), 1.0)
+                return 0.5 * (1.0 + _math.cos(_math.pi * progress))
             return 1.0
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
     else:
@@ -365,11 +447,15 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
     optimizer.zero_grad(set_to_none=True)
     no_sync = getattr(model, "no_sync", nullcontext)
     trainable_list = [p for p in raw_model.parameters() if p.requires_grad]
+    t_start = time.time()
+    step_times = []
+    grad_norm_pre = 0.0
 
     if is_main:
         print(f"\nFine-tuning for {cfg.train_steps} steps (locked_ckpt={'yes' if cfg.locked_ckpt else 'no'})...")
 
     for step in tqdm(range(cfg.train_steps), disable=not is_main):
+        t_step_start = time.time()
         model.train()
 
         for accum_idx in range(cfg.grad_accum_steps):
@@ -384,17 +470,19 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
                 else:
                     loss.backward()
 
+        # Pre-clip gradient norm (before clipping)
         if use_scaler:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(trainable_list, cfg.max_grad_norm)
+        grad_norm_pre = torch.nn.utils.clip_grad_norm_(trainable_list, cfg.max_grad_norm).item()
+        if use_scaler:
             scaler.step(optimizer)
             scaler.update()
         else:
-            torch.nn.utils.clip_grad_norm_(trainable_list, cfg.max_grad_norm)
             optimizer.step()
         if scheduler is not None:
             scheduler.step()
         optimizer.zero_grad(set_to_none=True)
+        step_times.append(time.time() - t_step_start)
         if (step % cfg.val_every == 0 or step == cfg.train_steps - 1) and is_main:
             # Fuse SpecDef wrappers for eval so locked and unlocked models
             # both evaluate through the same bf16 computation path.
@@ -437,6 +525,8 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
             sigma_mean = sum(sigma_vals) / len(sigma_vals) if sigma_vals else 0.0
             sigma_max = max(sigma_vals) if sigma_vals else 0.0
 
+            elapsed = time.time() - t_start
+            avg_step_time = sum(step_times) / len(step_times) if step_times else 0.0
             record = {
                 "step": step,
                 "train_loss": round(train_loss, 4),
@@ -448,6 +538,9 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
                 "l2_weight_change": round(l2_norm, 4),
                 "sigma_mean": round(sigma_mean, 4),
                 "sigma_max": round(sigma_max, 4),
+                "grad_norm_pre_clip": round(grad_norm_pre, 6),
+                "elapsed_s": round(elapsed, 1),
+                "step_time_s": round(avg_step_time, 3),
             }
             history.append(record)
 
@@ -464,7 +557,9 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
                 f"val_loss={record['val_loss']:.4f} | "
                 f"val_acc={record['val_acc']:.4f} | "
                 f"l2={record['l2_weight_change']:.2f} | "
-                f"σ_mean={record['sigma_mean']:.1f} σ_max={record['sigma_max']:.1f}"
+                f"σ_mean={record['sigma_mean']:.1f} σ_max={record['sigma_max']:.1f} | "
+                f"∇={record['grad_norm_pre_clip']:.2f} | "
+                f"{record['elapsed_s']:.0f}s"
                 f"{marker}",
                 flush=True,
             )

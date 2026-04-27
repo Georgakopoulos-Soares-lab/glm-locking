@@ -1,14 +1,35 @@
-# Data
+# Data & large files
 *.fasta
 *.fna
 *.fa
+*.fa.gz
+*.fna.gz
 .env
 
-# Results & checkpoints
-results
+# Results, checkpoints, embeddings
 results/
 *.pt
 *.pth
+
+# Experiment logs
+logs/
+*.log
+slurm-*.out
+
+# Paper draft (keep locally, not in remote)
+paper/
+
+# Archive (legacy scripts preserved locally)
+archive/
+
+# Figures (generated outputs)
+figures/
+
+# HVUE parquet data (downloaded separately)
+data/hvue/
+
+# Collapse-diag scratch configs
+configs/collapse_diag/
 
 # Python
 __pycache__/
@@ -30,6 +51,3 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Logs
-*.log
-slurm-*.out

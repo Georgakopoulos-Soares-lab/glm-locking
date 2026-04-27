@@ -1,0 +1,9 @@
+run_name: lock_alpha1M
+alpha: 1000000.0
+top_k: 25
+target_blocks: 32
+num_target_layers: 0
+target_layer_patterns:
+  - out_filter_dense
+  - inner_mha_cls.out_proj
+retain_data_path: data/retain.fasta

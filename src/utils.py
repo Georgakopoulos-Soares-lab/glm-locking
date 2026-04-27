@@ -64,6 +64,7 @@ class FinetuneConfig:
     model_name: str = "evo-1-8k-base"
     device: str = "cuda:0"
     data_path: str = "data/attack.fasta"
+    val_data_path: str | None = None  # if set, use as held-out val (overrides train_fraction split)
     seed: int = 42
     train_fraction: float = 0.9
     min_seq_len: int = 512
@@ -79,6 +80,7 @@ class FinetuneConfig:
     optimizer_name: str = "adamw"
     weight_decay: float = 0.0
     warmup_fraction: float = 0.0   # fraction of train_steps for linear LR warmup
+    lr_schedule: str = "constant"  # "constant" (warmup then flat) or "cosine" (warmup then cosine decay to 0)
 
     target_blocks: set = field(default_factory=lambda: set(range(8)))
     locked_ckpt: str | None = None
@@ -93,6 +95,9 @@ class FinetuneConfig:
     # The paper (Rosati et al., 2026) keeps C trainable — the Hessian cross-term
     # between W̃ and C is what causes divergence.  Set False to match the paper.
     freeze_comp: bool = True
+    # If True, freeze inflated W̃ matrices (comp-only ablation: only C learns).
+    # Tests whether SpecDef recovery is driven by C reconstructing W or by W̃ moving.
+    freeze_inflated: bool = False
     # Theorem 8 layer-injection bypass (black-box attacker).
     # Wraps every SpecDefLinear with a trainable bypass matrix B (identity init).
     # The locked W̃ and C are fully frozen; only B and non-locked model params train.
@@ -104,6 +109,14 @@ class FinetuneConfig:
     # k=2 and α=10k → σ per factor ≈ 100 (tractable).
     theorem8_injection: bool = False
     theorem8_k: int = 2
+    theorem8_factor_lr: float = 0.0   # if >0, use this lr for Theorem8 factor params
+
+    # LoRA attack: low-rank adapter injection on every nn.Linear in target_blocks.
+    # Base weights frozen; only LoRA A,B trained. Tests realistic adversary.
+    use_lora: bool = False
+    lora_rank: int = 16
+    lora_alpha: float = 32.0
+    lora_target_substrings: tuple = (".linear",)  # match SpecDef-wrapped Linear by default
 
 
 @dataclass
@@ -534,6 +547,36 @@ def maybe_load_locked_checkpoint(model, ckpt_path: str | None):
 
     # Detect SpecDef checkpoint: look for compensation keys (.comp.weight)
     specdef_keys = [k for k in state_dict if ".comp.weight" in k]
+    factor_keys = [k for k in state_dict if ".factors." in k]
+
+    # Theorem8 checkpoint: fuse SVD factors back into single weight matrices
+    if factor_keys:
+        import re
+        print(f"  Detected Theorem8 checkpoint ({len(factor_keys)} factor keys) — fusing factors")
+        fused_keys = set()
+        for key in sorted(factor_keys):
+            m = re.match(r"(.+)\.factors\.(\d+)\.weight", key)
+            if not m:
+                continue
+            prefix = m.group(1)
+            if prefix in fused_keys:
+                continue
+            # Collect all factor matrices for this layer
+            factors = []
+            for k_idx in range(10):  # max k=10
+                fk = f"{prefix}.factors.{k_idx}.weight"
+                if fk in state_dict:
+                    factors.append(state_dict.pop(fk))
+                else:
+                    break
+            # Fuse: W = factors[k-1] @ ... @ factors[1] @ factors[0]
+            W = factors[0]
+            for fi in range(1, len(factors)):
+                W = factors[fi] @ W
+            state_dict[f"{prefix}.linear.weight"] = W
+            fused_keys.add(prefix)
+        print(f"  Fused {len(fused_keys)} factor groups into linear weights")
+
     if specdef_keys:
         print(f"  Detected SpecDef checkpoint ({len(specdef_keys)} compensation keys)")
         _apply_specdef_checkpoint(model, state_dict, specdef_keys)
@@ -573,8 +616,10 @@ def _apply_specdef_checkpoint(model, state_dict: dict, specdef_keys: list[str]):
 
         inflated = torch.nn.Linear(d_in, d_out, bias=False,
                                    dtype=torch.float32, device=device)
+        # Respect stored C dtype (float64 used by rebuild_specdef_f64.py for precision)
+        comp_dtype = C.dtype if C.dtype in (torch.float32, torch.float64, torch.bfloat16) else torch.float32
         comp = torch.nn.Linear(d_out, d_out, bias=False,
-                               dtype=torch.float32, device=device)
+                               dtype=comp_dtype, device=device)
 
         if orig_bias is not None:
             orig_bias = orig_bias.to(device)

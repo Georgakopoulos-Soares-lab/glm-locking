@@ -1,7 +1,0 @@
-# SpecDef exact locking — alpha=1000 (10^3)
-# The paper shows alpha=1k gives partial resistance on Llama-8B (Table 4)
-run_name: lock_specdef_alpha1k
-alpha: 1000.0
-top_k: 25
-target_blocks: 32          # all 32 blocks (29 Hyena + 3 MHA, but only Hyena have out_filter_dense)
-retain_data_path: data/retain.fasta

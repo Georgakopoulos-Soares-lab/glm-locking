@@ -76,8 +76,15 @@ class SpecDefLinear(nn.Module):
         with torch.autocast(device_type="cuda", enabled=False):
             h = self.linear(x.float())
             # comp.weight may be stored as bf16 to save GPU memory (frozen)
+            # or as float64 for high-precision zero-shot equivalence (rebuild_specdef_f64).
             c_w = self.comp.weight
-            out = _F.linear(h, c_w.float() if c_w.dtype != torch.float32 else c_w, None)
+            if c_w.dtype == torch.float64:
+                # Upcast h to f64, do C·h in f64, downcast.
+                out = _F.linear(h.double(), c_w, None).float()
+            elif c_w.dtype == torch.float32:
+                out = _F.linear(h, c_w, None)
+            else:
+                out = _F.linear(h, c_w.float(), None)
             if self.bias is not None:
                 out = out + self.bias
         return out.to(x.dtype)

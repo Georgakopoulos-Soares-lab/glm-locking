@@ -1,7 +1,0 @@
-# SpecDef exact locking — alpha=10000 (10^4)
-# The paper shows alpha=10k causes universal divergence on Llama-8B (Table 4)
-run_name: lock_specdef_alpha10k
-alpha: 10000.0
-top_k: 25
-target_blocks: 32
-retain_data_path: data/retain.fasta
