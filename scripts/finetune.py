@@ -14,6 +14,7 @@ Usage:
     python scripts/finetune.py --unlocked
 """
 
+import math
 import os
 import sys
 import time
@@ -267,11 +268,11 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
             print(f"[freeze_filter_params=True] Removed {before - len(target_names_set)} "
                   f"filter tensors from trainable set ({len(target_names_set)} remaining)")
 
-    # Theorem 8 layer injection: also freeze W̃ (linear.weight inside SpecDefLinear)
-    # so that ONLY the injected bypass B trains.  The BypassSpecDefLinear forward
-    # already wraps the specdef path in torch.no_grad(), but we also remove it from
-    # target_names_set so freeze_all_except sets requires_grad=False.
-    _LINEAR_SUFFIXES = (".specdef.linear.weight",)
+    # Theorem 8 layer injection: freeze the locked linear weights so ONLY B trains.
+    # Old code: BypassSpecDefLinear stored self.specdef, so we froze ".specdef.linear.weight".
+    # New code: BypassSpecDefLinear precomputes self.fused (W_fused = C@W̃.bf16), so we
+    # freeze ".fused.weight" instead. Both suffixes listed for backwards compatibility.
+    _LINEAR_SUFFIXES = (".specdef.linear.weight", ".fused.weight")
     if cfg.layer_injection:
         before = len(target_names_set)
         target_names_set = {
@@ -474,6 +475,18 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
         if use_scaler:
             scaler.unscale_(optimizer)
         grad_norm_pre = torch.nn.utils.clip_grad_norm_(trainable_list, cfg.max_grad_norm).item()
+
+        # Skip NaN/inf steps — prevents NaN params from poisoning future steps.
+        # Happens when large-σ bypass matrices cause bf16 intermediate overflow.
+        if math.isnan(grad_norm_pre) or math.isinf(grad_norm_pre):
+            optimizer.zero_grad(set_to_none=True)
+            if use_scaler:
+                scaler.update()  # keep scaler state consistent
+            print(f"[NaN skip] step {step} grad_norm={grad_norm_pre:.4g} — skipping optimizer step",
+                  flush=True)
+            step_times.append(time.time() - t_step_start)
+            continue
+
         if use_scaler:
             scaler.step(optimizer)
             scaler.update()
@@ -551,6 +564,30 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
                 if cfg.save_checkpoint and is_main:
                     best_ckpt = os.path.join(cfg.results_dir, "model_best.pt")
                     torch.save(raw_model.state_dict(), best_ckpt)
+
+            # ---- Periodic checkpoint ----------------------------------------
+            ckpt_every = getattr(cfg, "checkpoint_every", 0)
+            if cfg.save_checkpoint and is_main and ckpt_every > 0 and step > 0 and step % ckpt_every == 0:
+                ckpt_dir = os.path.join(cfg.results_dir, "checkpoints")
+                os.makedirs(ckpt_dir, exist_ok=True)
+                periodic_path = os.path.join(ckpt_dir, f"step_{step:05d}.pt")
+                torch.save(raw_model.state_dict(), periodic_path)
+                print(f"[ckpt] Saved periodic checkpoint: {periodic_path}", flush=True)
+
+            # ---- Plateau checkpoint -----------------------------------------
+            plateau_window = getattr(cfg, "plateau_window", 0)
+            if cfg.save_checkpoint and is_main and plateau_window > 0 and len(history) >= plateau_window:
+                recent = [r["val_loss"] for r in history[-plateau_window:]]
+                plateau_delta = getattr(cfg, "plateau_delta", 0.001)
+                if (max(recent) - min(recent)) < plateau_delta:
+                    ckpt_dir = os.path.join(cfg.results_dir, "checkpoints")
+                    os.makedirs(ckpt_dir, exist_ok=True)
+                    plateau_path = os.path.join(ckpt_dir, f"plateau_step_{step:05d}.pt")
+                    # Only write if we haven't already written one this plateau
+                    if not os.path.exists(plateau_path):
+                        torch.save(raw_model.state_dict(), plateau_path)
+                        print(f"[ckpt] Saved plateau checkpoint: {plateau_path}", flush=True)
+
             print(
                 f"Step {step:05d} | "
                 f"train_loss={record['train_loss']:.4f} | "

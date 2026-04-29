@@ -87,6 +87,14 @@ class FinetuneConfig:
 
     save_checkpoint: bool = True
     use_gradient_checkpointing: bool = True
+    # Save an intermediate checkpoint every N steps (0 = disabled).
+    # Checkpoints go to <results_dir>/checkpoints/step_NNNNN.pt
+    checkpoint_every: int = 0
+    # Save an extra intermediate checkpoint when val_loss has not improved by more
+    # than plateau_delta for plateau_window consecutive val evaluations.
+    # Set to 0 to disable plateau detection.
+    plateau_window: int = 0
+    plateau_delta: float = 0.001
     # If True, freeze Hyena filter params (poles, residues, short_filter_weight/bias, D)
     # during the attack — removes the SSM bypass route, making it a fairer test of
     # whether the spectral lock on weight matrices actually works.

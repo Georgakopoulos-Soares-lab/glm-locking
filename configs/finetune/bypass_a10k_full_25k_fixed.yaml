@@ -1,0 +1,27 @@
+mode: locked
+run_name: ft_bypass_a10k_full_25k_fixed
+data_path: data/attack_train.fasta
+val_data_path: data/attack_heldout.fasta
+train_steps: 25000
+lr: 1.0e-05
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 0.5
+optimizer_name: adamw8bit
+weight_decay: 0.0
+warmup_fraction: 0.0
+target_blocks: 32
+freeze_comp: true
+layer_injection: true
+use_gradient_checkpointing: true
+save_checkpoint: true
+checkpoint_every: 5000     # save step_05000.pt, step_10000.pt, step_15000.pt, step_20000.pt
+plateau_window: 10         # save plateau ckpt if val_loss flat for 10 consecutive evals (1000 steps)
+plateau_delta: 0.002
+train_fraction: 0.9
+seed: 42
+locked_ckpt: results/lock_alpha10k/model_specdef.pt
+results_dir: results/ft_bypass_a10k_full_25k_fixed

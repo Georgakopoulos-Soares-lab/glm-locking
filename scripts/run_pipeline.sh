@@ -80,4 +80,26 @@ touch "$LOCK_PROBE"
     --out results/hvue_probe.csv 2>&1 | tee -a "$LOG"
 ) 201>"$LOCK_PROBE"
 
+# ---- Step 5: HVUE pipeline on intermediate checkpoints (if any) ----------
+CKPT_DIR="results/${ACTUAL_RUN_NAME}/checkpoints"
+if [[ -d "$CKPT_DIR" ]]; then
+  INTER_CKPTS=( $(ls "$CKPT_DIR"/*.pt 2>/dev/null | sort) )
+  if [[ ${#INTER_CKPTS[@]} -gt 0 ]]; then
+    echo "[$(date)] >>> Step 5: intermediate checkpoint evaluation (${#INTER_CKPTS[@]} ckpts)" | tee -a "$LOG"
+    for INTER in "${INTER_CKPTS[@]}"; do
+      INTER_NAME="${ACTUAL_RUN_NAME}__$(basename "$INTER" .pt)"
+      echo "[$(date)]   evaluating $INTER_NAME" | tee -a "$LOG"
+      CUDA_VISIBLE_DEVICES=$GPU $PY -u scripts/hvue_extract_one_ckpt.py \
+        --ckpt_name "$INTER_NAME" \
+        --ckpt_path "$INTER" 2>&1 | tee -a "$LOG"
+    done
+    # Re-run probe to include intermediate ckpts in summary table
+    ( flock -x 201
+      $PY -u scripts/hvue_probe.py \
+        --emb_dir results/hvue_embeddings \
+        --out results/hvue_probe.csv 2>&1 | tee -a "$LOG"
+    ) 201>"$LOCK_PROBE"
+  fi
+fi
+
 echo "[$(date)] PIPELINE DONE  $ACTUAL_RUN_NAME" | tee -a "$LOG"

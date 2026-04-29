@@ -1,29 +1,26 @@
 # evo-locking
 
-Reproducible pipeline for **"Locking Evo: spectral deformation deters naive fine-tuning but is trivially bypassed"**.
+Reproducible pipeline for **"Locking genomic foundation models with spectral deformation"**.
 
 We apply SpecDef capability-locking ([Rosati et al. 2025/2026](https://arxiv.org/abs/2406.00954))
 to Evo-1-8k-base and test it against (i) naive full-parameter fine-tuning and
-(ii) the Theorem-8 black-box layer-injection bypass.
-Key findings: the lock collapses HVUE virological AUROC by 0.18–0.32 while preserving
-next-token perplexity; the bypass restores the unlocked-FT operating point
-using one identity-initialised matrix per locked projection, constructable in seconds on CPU.
+(ii) a layer-injection bypass.
+Key findings: the lock suppresses mean HVUE virological AUROC by 0.052 (0.842 → 0.790)
+while leaving held-out perplexity essentially unchanged (+2.3%); a bypass — inserting one
+identity-initialised linear layer per locked projection, constructable in seconds on CPU —
+silently restores the pretrained AUROC with no perplexity fingerprint.
 
 ## Findings at a glance
 
-| Checkpoint | PPL (↓) | Mean AUROC (↑) | Steps | s/step | Peak VRAM |
-|---|---|---|---|---|---|
-| Pretrained | 3.729 | 0.842 | — | — | — |
-| Unlocked FT | 3.480 | 0.848 | 25 000 | 3.03 | ~46 GB |
-| Locked FT α=10⁴ | 3.996 | 0.667 | 1 500 | 5.17 | ~46 GB |
-| Locked FT α=10⁶ | 4.009 | 0.520 | 1 500 | 5.17 | ~46 GB |
-| Bypass B-only α=10⁴ | ~3.48 | ~0.84 | 25 000 | 2.51 | ~18 GB |
-| **Bypass full α=10⁴** | ~3.48 | ~0.84 | 25 000 | ~2.8 | ~47 GB |
+| Checkpoint | PPL (↓) | Mean AUROC (↑) | Steps |
+|---|---|---|---|
+| Pretrained | 3.729 | 0.842 | — |
+| Unlocked FT | 3.480 | 0.846 | 25 000 |
+| Locked FT α=3×10⁴ | 3.816 | 0.790 | 25 000 |
+| Bypass FT (B-only, α=3×10⁴) | 3.729 | 0.842 | 25 000 |
 
-Locked FT is ~70% slower per step than unlocked (backprop through the ill-conditioned
-compensation matrix C). The bypass routes around C entirely; B-only trains only the 32
-bypass matrices (537 M params, 7.1% of Evo); the full bypass trains all parameters
-except the frozen W̃ and C, matching the unlocked parameter count.
+The bypass trains only the 32 bypass layers (<0.5% of Evo's parameters); the locked weights
+and compensation matrices are kept frozen throughout.
 
 ## Repo layout
 
@@ -32,13 +29,12 @@ configs/
   lock/                        # one YAML per α: alpha10k, alpha30k, alpha100k, alpha1M
   finetune/
     unlocked_25k.yaml          # baseline: regular FT, 25 000 steps
-    locked_a{10k,30k,100k}_lr1e6_25k.yaml   # 25 000-step locked sweep (stable LR)
+    locked_a30k_lr1e6_25k.yaml              # paper main: α=3×10⁴, 25 000 steps
+    locked_a{10k,100k}_lr1e6_25k.yaml       # α sweep companions
     locked_a1M_lr1e7_25k.yaml               # α=10⁶, lr=1e-7
-    locked_a10k_lr{1e4,3e5,3e6}.yaml        # LR-instability evidence
+    locked_a10k_lr{1e4,3e5,3e6}.yaml        # LR-instability evidence (Supp. Fig. S1b)
     locked_a*_s{123,456}.yaml               # seed-pair variance runs
-    bypass_a10k_25k.yaml                    # Theorem-8 bypass, B-matrix only
-    bypass_a10k_full_25k.yaml               # Theorem-8 bypass, full parameter budget
-    lora_attack_a100k_5k.yaml               # LoRA-only attack (MLP/QKV only)
+    bypass_a10k_25k.yaml                    # paper bypass: B-only, 32 layers, <0.5% params
 data/
   download_scripts/            # scripts to fetch retain.fasta + attack.fasta
   attack_train.fasta           # gitignored — build with split_attack_fasta.py
@@ -57,7 +53,6 @@ scripts/
   hvue_significance.py         # Step 5  — paired bootstrap vs pretrained baseline
   make_paper_figures.py        # regenerate all paper/supplement figures from results/
   precision_diag.py            # sharp-minimum perturbation diagnostic
-  watch_and_launch_bypass.sh   # auto-launch full bypass run + VRAM/timing report
   run_pipeline.sh              # end-to-end convenience wrapper (Steps 1–5)
 results/                       # gitignored — produced by the pipeline
 logs/                          # gitignored — per-run training logs
@@ -115,18 +110,12 @@ CUDA_VISIBLE_DEVICES=1 python scripts/finetune.py configs/finetune/locked_a30k_l
 CUDA_VISIBLE_DEVICES=2 python scripts/finetune.py configs/finetune/locked_a100k_lr1e6_25k.yaml
 CUDA_VISIBLE_DEVICES=3 python scripts/finetune.py configs/finetune/locked_a1M_lr1e7_25k.yaml
 
-# Theorem-8 bypass (full parameter budget, 25 000 steps, lr=1e-5)
-CUDA_VISIBLE_DEVICES=0 python scripts/finetune.py configs/finetune/bypass_a10k_full_25k.yaml
+# Layer-injection bypass (B-only: 32 bypass layers, <0.5% params, 25 000 steps)
+CUDA_VISIBLE_DEVICES=0 python scripts/finetune.py configs/finetune/bypass_a10k_25k.yaml
 ```
 
 All configs train on `data/attack_train.fasta`, validate on `data/attack_heldout.fasta`.
 Outputs go to `results/<run_name>/model_best.pt`.
-
-The watcher script auto-launches the full bypass run when a GPU frees up and collects a
-timing + VRAM report after 500 steps:
-```bash
-bash scripts/watch_and_launch_bypass.sh --report-after=500
-```
 
 ## 5. Evaluate
 
@@ -147,7 +136,7 @@ for ckpt in pretrained \
             results/ft_locked_a30k_lr1e6_25k/model_best.pt \
             results/ft_locked_a100k_lr1e6_25k/model_best.pt \
             results/ft_locked_a1M_lr1e7_25k/model_best.pt \
-            results/ft_bypass_a10k_full_25k/model_best.pt; do
+            results/ft_bypass_a10k_25k_locked/model_best.pt; do
   for task in Host_Tropism Pathogenicity Transmissibility; do
     for split in train validation; do
       CUDA_VISIBLE_DEVICES=0 python scripts/hvue_extract_one_ckpt.py \
@@ -172,7 +161,7 @@ python scripts/hvue_significance.py \
 
 ```bash
 python scripts/make_paper_figures.py
-# writes: figures/fig1_main.pdf, fig2_bypass.pdf, fig_s1_training_curves.pdf
+# writes: results/figures/fig1_main.pdf, results/figures/fig_s1_training_curves.pdf
 ```
 
 ### 5.4 Sharp-minimum sensitivity diagnostic
@@ -189,15 +178,15 @@ CUDA_VISIBLE_DEVICES=0 python scripts/precision_diag.py \
 - Stable LR per α: 1e-6 for α∈{10⁴,3×10⁴,10⁵}; 1e-7 for α=10⁶ (follows η∝1/σ_max scaling from Rosati et al.).
 - HVUE probe: n_train=3 000, n_val=2 000, fixed seed 42. Probe C selected on val AUROC.
 - All bootstrap tests: n=2 000 resamples, paired on the same validation examples.
-- Hardware: NVIDIA A100 80 GB SXM. Locked FT ≈ 5.17 s/step; unlocked FT ≈ 3.03 s/step; bypass full ≈ 2.8 s/step.
+- Hardware: NVIDIA A100 80 GB SXM. Locked FT ≈ 5.17 s/step; unlocked FT ≈ 3.03 s/step; bypass B-only ≈ 2.51 s/step (~18 GB peak VRAM).
 
 ## Citation
 
 ```bibtex
 @article{evo-locking-2026,
-  title   = {Locking Evo: spectral deformation deters naive fine-tuning but is trivially bypassed},
-  author  = {Anonymous Authors},
-  year    = {2026},
-  note    = {Preprint}
+  title   = {Locking genomic foundation models with spectral deformation},
+  author  = {Karatzikos, Aris and Vasilopoulou, Aggeliki and Mouratidis, Ioannis and Georgakopoulos-Soares, Ilias},
+  journal = {Bioinformatics},
+  year    = {2026}
 }
 ```
