@@ -69,9 +69,6 @@ configs/
     theorem8_a30k_k5_25k.yaml  # Attack J: SVD-chain k=5, α=3×10⁴
 data/
   download_scripts/            # data download and preparation scripts (see §2)
-  attack_train.fasta           # gitignored — built by split_attack_fasta.py
-  attack_heldout.fasta         # gitignored — built by split_attack_fasta.py
-  hvue/                        # gitignored — HVUE parquet shards from duttaprat/HVUE
 src/
   utils.py                     # shared data-loading, model-loading, SpecDef inject helpers
   lora.py                      # LoRA injection (skips SpecDefLinear layers)
@@ -87,10 +84,6 @@ scripts/
   precision_diag.py            # fp32/bf16 forward-pass preservation diagnostic
   profile_attack_overhead.py   # measure per-step time and parameter counts per config
   run_pipeline.sh              # end-to-end convenience wrapper (Steps 2–5)
-results/                       # gitignored — produced by the pipeline
-logs/                          # gitignored — per-run training logs
-paper/                         # LaTeX source for the manuscript
-archive/                       # legacy exploratory scripts and superseded configs
 ```
 
 ---
