@@ -272,19 +272,38 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
     # Old code: BypassSpecDefLinear stored self.specdef, so we froze ".specdef.linear.weight".
     # New code: BypassSpecDefLinear precomputes self.fused (W_fused = C@W̃.bf16), so we
     # freeze ".fused.weight" instead. Both suffixes listed for backwards compatibility.
+    # freeze_injected_fused=False: unfreeze fused weights too — used for the full-unfreeze
+    # experiment where C@W̃ is allowed to move under gradient descent.
     _LINEAR_SUFFIXES = (".specdef.linear.weight", ".fused.weight")
     if cfg.layer_injection:
+        freeze_injected_fused = getattr(cfg, "freeze_injected_fused", True)
         before = len(target_names_set)
-        target_names_set = {
-            n for n in target_names_set
-            if not any(n.endswith(s) for s in _LINEAR_SUFFIXES)
-        }
+        if freeze_injected_fused:
+            target_names_set = {
+                n for n in target_names_set
+                if not any(n.endswith(s) for s in _LINEAR_SUFFIXES)
+            }
+        else:
+            # BypassSpecDefLinear.__init__ hardcodes requires_grad=False on fused.weight.
+            # Re-enable grad here so freeze_all_except can include them in the trainable set.
+            n_unfrozen = 0
+            for n, p in model.named_parameters():
+                if any(n.endswith(s) for s in _LINEAR_SUFFIXES):
+                    p.requires_grad_(True)
+                    n_unfrozen += 1
+            fused_names = {n for n, _ in model.named_parameters()
+                           if any(n.endswith(s) for s in _LINEAR_SUFFIXES)}
+            target_names_set |= fused_names
         # Add bypass weights (these live under .bypass.weight inside BypassSpecDefLinear)
         bypass_names = {n for n, _ in model.named_parameters() if n.endswith(".bypass.weight")}
         target_names_set |= bypass_names
         if is_main:
-            print(f"[layer_injection] Froze {before - len(target_names_set) + len(bypass_names)} W̃ params, "
-                  f"added {len(bypass_names)} bypass params to trainable set")
+            if freeze_injected_fused:
+                print(f"[layer_injection] Froze {before - len(target_names_set) + len(bypass_names)} W̃ params, "
+                      f"added {len(bypass_names)} bypass params to trainable set")
+            else:
+                print(f"[layer_injection] freeze_injected_fused=False: re-enabled grad on {n_unfrozen} fused "
+                      f"weights + added {len(bypass_names)} bypass params to trainable set")
 
     # Optionally freeze SpecDef compensation matrices (C).
     # Default (freeze_comp=True): C is frozen — original behaviour.
@@ -303,15 +322,24 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
         # Convert all C matrices to bf16 to save GPU memory (frozen, no gradient needed)
         # Must run before freeze_all_except (params still have requires_grad here)
         # Skip if comp is float64 (rebuild_specdef_f64 — preserve precision).
+        # IMPORTANT: do NOT cast if cast_comp_bf16=False (LoRA runs keep C in float32).
+        # Casting C to bf16 causes catastrophic error in specdef_fused_eval when
+        # SpecDefLinear is active: fused_w = C_bf16.float() @ W̃ has error amplified
+        # by σ_max(W̃)=215,339, giving completely wrong fused weights → val_ppl ~280.
+        cast_comp = getattr(cfg, "cast_comp_bf16", True)
         n_cast = 0
-        for name, param in model.named_parameters():
-            if any(name.endswith(s) for s in _COMP_SUFFIXES):
-                if param.dtype == torch.float64:
-                    continue   # keep f64 for high-precision zero-shot equivalence
-                param.data = param.data.to(torch.bfloat16)
-                n_cast += 1
-        if n_cast > 0 and is_main:
-            print(f"[SpecDef] Converted {n_cast} C matrices to bf16 (saves ~{n_cast * 256}MB GPU memory)")
+        if cast_comp:
+            for name, param in model.named_parameters():
+                if any(name.endswith(s) for s in _COMP_SUFFIXES):
+                    if param.dtype == torch.float64:
+                        continue   # keep f64 for high-precision zero-shot equivalence
+                    param.data = param.data.to(torch.bfloat16)
+                    n_cast += 1
+            if n_cast > 0 and is_main:
+                print(f"[SpecDef] Converted {n_cast} C matrices to bf16 (saves ~{n_cast * 256}MB GPU memory)")
+        else:
+            if is_main:
+                print("[SpecDef] cast_comp_bf16=False: C stays in float32 (correct specdef_fused_eval)")
     else:
         n_comp = sum(1 for n in target_names_set if any(n.endswith(s) for s in _COMP_SUFFIXES))
         if n_comp > 0 and is_main:
@@ -441,6 +469,21 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
     coverage = tokens_seen / total_train_nt if total_train_nt > 0 else 0.0
     if is_main:
         print(f"Tokens to see: {tokens_seen:,} ({100 * coverage:.2f}% of train data)")
+
+    # --- Resume from checkpoint (if specified) ---
+    if getattr(cfg, 'resume_from', None):
+        resume_path = cfg.resume_from
+        if is_main:
+            print(f"[resume] Loading weights from {resume_path}")
+        # Load to CPU first to avoid doubling GPU memory during load
+        ckpt_sd = torch.load(resume_path, map_location="cpu")
+        missing, unexpected = raw_model.load_state_dict(ckpt_sd, strict=False)
+        del ckpt_sd
+        torch.cuda.empty_cache()
+        if is_main:
+            if missing:    print(f"[resume] Missing keys:    {len(missing)}")
+            if unexpected: print(f"[resume] Unexpected keys: {len(unexpected)}")
+            print(f"[resume] Weights loaded from step checkpoint — training from step 0 with these weights.")
 
     # --- Training loop ---
     history = []

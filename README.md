@@ -1,191 +1,395 @@
-# evo-locking
+# glm-locking
 
-Reproducible pipeline for **"Locking genomic foundation models with spectral deformation"**.
+Reproducible pipeline for:
 
-We apply SpecDef capability-locking ([Rosati et al. 2025/2026](https://arxiv.org/abs/2406.00954))
-to Evo-1-8k-base and test it against (i) naive full-parameter fine-tuning and
-(ii) a layer-injection bypass.
-Key findings: the lock suppresses mean HVUE virological AUROC by 0.052 (0.842 → 0.790)
-while leaving held-out perplexity essentially unchanged (+2.3%); a bypass — inserting one
-identity-initialised linear layer per locked projection, constructable in seconds on CPU —
-silently restores the pretrained AUROC with no perplexity fingerprint.
+> **Spectral locking as a defence for open-weight genomic foundation models**  
+> Aris Karatzikos · Aggeliki Vasilopoulou · Candace SY Chan · Ioannis Mouratidis · Ilias Georgakopoulos-Soares  
+> *Bioinformatics* (2026)
+
+We apply Spectral Deformation (SpecDef) locking ([Rosati et al. 2025/2026](https://arxiv.org/abs/2406.00954))
+to [Evo-1-8k-base](https://huggingface.co/togethercomputer/evo-1-8k-base) (7 B parameters, StripedHyena)
+and stress-test it against ten attack configurations spanning five attack classes. Every practical
+attack is deterred; only the SVD-chain factorisation (Theorem 8) achieves partial recovery, constrained
+to a k-dependent PPL–AUROC trade-off surface from which the unlocked operating point is unreachable.
+
+---
 
 ## Findings at a glance
 
-| Checkpoint | PPL (↓) | Mean AUROC (↑) | Steps |
-|---|---|---|---|
-| Pretrained | 3.729 | 0.842 | — |
-| Unlocked FT | 3.480 | 0.846 | 25 000 |
-| Locked FT α=3×10⁴ | 3.816 | 0.790 | 25 000 |
-| Bypass FT (B-only, α=3×10⁴) | 3.729 | 0.842 | 25 000 |
+Results from Table 1 of the paper. Two lock strengths (α = 10⁴ and α = 3×10⁴) are evaluated;
+attacks at α = 3×10⁴ are labelled the "strong lock" and are the primary evaluation. Virological
+capability is measured by mean AUROC over three HVUE tasks (Host Tropism, Pathogenicity,
+Transmissibility) using ℓ₂-regularised linear SVM probes on mean-pooled final-layer activations.
 
-The bypass trains only the 32 bypass layers (<0.5% of Evo's parameters); the locked weights
-and compensation matrices are kept frozen throughout.
+| Condition | α | PPL ↓ | Tropism | Pathog. | Trans. | Mean AUROC ↑ |
+|---|---|---|---|---|---|---|
+| Pretrained (no FT) | — | 3.729 | 0.860 | 0.815 | 0.852 | 0.842 |
+| Locked, no FT | 3×10⁴ | 3.729 | ≡ pretrained | | | |
+| Unlocked FT (25k steps) | — | 3.487 | 0.876 | 0.842 | 0.871 | **0.867** |
+| **A.** Naive FT | 10⁴ | 3.753 | 0.864 | 0.818 | 0.862 | 0.848 |
+| **B.** Naive FT | 3×10⁴ | 3.816*** | 0.797 | 0.788 | 0.785 | 0.790*** |
+| **C.** Aggressive FT (η=10⁻⁴) | 3×10⁴ | *diverged — grad norm = ∞ from step 109* | | | | |
+| **D.** LoRA r=16 | 10⁴ | 3.729 | 0.839 | 0.766 | 0.779 | 0.795** |
+| **E.** Inserted-layer bypass | 10⁴ | 4.091*** | 0.688 | 0.735 | 0.845 | 0.756*** |
+| **F.** Inserted-layer bypass | 3×10⁴ | 4.123*** | 0.707 | 0.735 | 0.848 | 0.763*** |
+| **G.** SVD-chain k=3 | 10⁴ | 3.667* | 0.817 | 0.782 | 0.819 | 0.806** |
+| **H.** SVD-chain k=1 | 3×10⁴ | 3.888*** | **0.881** | **0.837** | **0.889** | **0.869**†** |
+| **I.** SVD-chain k=3 | 3×10⁴ | 3.705** | 0.858 | 0.803 | 0.845 | 0.836** |
+| **J.** SVD-chain k=5 | 3×10⁴ | 3.760* | 0.852 | 0.808 | 0.845 | 0.835** |
+
+p-values by paired bootstrap (n=2000) vs. pretrained: \*p<0.05; \*\*p<0.01; \*\*\*p<10⁻³.  
+†Matches the unlocked ceiling within noise.
+
+Key findings:
+- Under the **strong lock** (α=3×10⁴), naive fine-tuning **actively suppresses** AUROC below pretrained (0.790 vs 0.842).
+- **Aggressive fine-tuning** hard-diverges within 109 steps — the curvature barrier is a hard arithmetic constraint, not a soft penalty.
+- The **inserted-layer bypass** (attacks E, F) eliminates gradient-flow obstruction but catastrophically overfits on the small pathogen corpus (~550k tokens / 537M new parameters), producing models worse than both pretrained and locked-naive.
+- Only the **SVD-chain factorisation** (attacks H, I, J) breaks the curvature barrier without catastrophic overfitting, but traces a k-dependent PPL–AUROC trade-off that no configuration resolves — no attack enters the target zone (PPL ≤ 3.729 AND AUROC ≥ 0.867).
+
+---
 
 ## Repo layout
 
 ```
 configs/
-  lock/                        # one YAML per α: alpha10k, alpha30k, alpha100k, alpha1M
+  lock/
+    alpha10k.yaml              # lock α=10⁴  — produces results/lock_alpha10k/model_specdef.pt
+    alpha30k.yaml              # lock α=3×10⁴ — produces results/lock_alpha30k/model_specdef.pt
   finetune/
-    unlocked_25k.yaml          # baseline: regular FT, 25 000 steps
-    locked_a30k_lr1e6_25k.yaml              # paper main: α=3×10⁴, 25 000 steps
-    locked_a{10k,100k}_lr1e6_25k.yaml       # α sweep companions
-    locked_a1M_lr1e7_25k.yaml               # α=10⁶, lr=1e-7
-    locked_a10k_lr{1e4,3e5,3e6}.yaml        # LR-instability evidence (Supp. Fig. S1b)
-    locked_a*_s{123,456}.yaml               # seed-pair variance runs
-    bypass_a10k_25k.yaml                    # paper bypass: B-only, 32 layers, <0.5% params
+    unlocked_25k_v2.yaml       # unlocked baseline  (η=1e-5, 25k steps)
+    locked_a10k_lr1e6_25k.yaml # Attack A: naive FT, α=10⁴,   η=1e-6, 25k steps
+    locked_a30k_lr1e6_25k.yaml # Attack B: naive FT, α=3×10⁴, η=1e-6, 25k steps
+    locked_a10k_lr1e4.yaml     # Attack C: aggressive FT, α=3×10⁴, η=1e-4 (diverges)
+    lora_a10k_25k.yaml         # Attack D: LoRA r=16, α=10⁴
+    bypass_a10k_25k_v2.yaml    # Attack E: inserted-layer bypass, α=10⁴
+    bypass_a30k_25k.yaml       # Attack F: inserted-layer bypass, α=3×10⁴
+    theorem8_a10k_k3_25k.yaml  # Attack G: SVD-chain k=3, α=10⁴
+    theorem8_a30k_k1_25k.yaml  # Attack H: SVD-chain k=1, α=3×10⁴
+    theorem8_a30k_k3_25k.yaml  # Attack I: SVD-chain k=3, α=3×10⁴
+    theorem8_a30k_k5_25k.yaml  # Attack J: SVD-chain k=5, α=3×10⁴
 data/
-  download_scripts/            # scripts to fetch retain.fasta + attack.fasta
-  attack_train.fasta           # gitignored — build with split_attack_fasta.py
-  attack_heldout.fasta         # gitignored
-  hvue/                        # gitignored — parquet shards from duttaprat/HVUE
+  download_scripts/            # data download and preparation scripts (see §2)
+  attack_train.fasta           # gitignored — built by split_attack_fasta.py
+  attack_heldout.fasta         # gitignored — built by split_attack_fasta.py
+  hvue/                        # gitignored — HVUE parquet shards from duttaprat/HVUE
 src/
-  utils.py                     # shared helpers
+  utils.py                     # shared data-loading, model-loading, SpecDef inject helpers
   lora.py                      # LoRA injection (skips SpecDefLinear layers)
 scripts/
-  lock_specdef.py              # Step 1  — SVD-based SpecDef locking
+  lock_specdef.py              # Step 1  — algebraic SVD-based SpecDef locking
   finetune.py                  # Step 2  — fine-tune locked or unlocked checkpoint
-  split_attack_fasta.py        # build accession-disjoint train/heldout split
-  attack_ppl.py                # Step 3a — held-out perplexity across all checkpoints
-  hvue_extract_one_ckpt.py     # Step 3b — extract mean-pooled residual-stream embeddings
-  hvue_probe.py                # Step 4  — ℓ₂-LogReg linear probe → AUROC table
-  hvue_significance.py         # Step 5  — paired bootstrap vs pretrained baseline
-  make_paper_figures.py        # regenerate all paper/supplement figures from results/
-  precision_diag.py            # sharp-minimum perturbation diagnostic
-  run_pipeline.sh              # end-to-end convenience wrapper (Steps 1–5)
+  split_attack_fasta.py        # build accession-disjoint genus-stratified train/heldout split
+  attack_ppl.py                # Step 3a — compute held-out perplexity across all checkpoints
+  hvue_extract_one_ckpt.py     # Step 3b — extract mean-pooled final-layer embeddings
+  hvue_probe.py                # Step 4  — ℓ₂-SVM linear probe → AUROC / accuracy / F1 / MCC
+  hvue_significance.py         # Step 5  — paired bootstrap significance vs pretrained baseline
+  make_paper_figures.py        # regenerate all paper figures from results/ CSVs
+  precision_diag.py            # fp32/bf16 forward-pass preservation diagnostic
+  profile_attack_overhead.py   # measure per-step time and parameter counts per config
+  run_pipeline.sh              # end-to-end convenience wrapper (Steps 2–5)
 results/                       # gitignored — produced by the pipeline
 logs/                          # gitignored — per-run training logs
-paper/                         # gitignored — manuscript draft (LaTeX)
-figures/                       # gitignored — generated PDF figures
-archive/                       # gitignored — legacy exploratory scripts
+paper/                         # LaTeX source for the manuscript
+archive/                       # legacy exploratory scripts and superseded configs
 ```
 
-## 1. Setup
+---
+
+## 1. Environment setup
 
 ```bash
-bash setup_evo_env.sh      # creates conda env `evo` with all Evo/PyTorch/bitsandbytes deps
+bash setup_evo_env.sh
+# Creates conda env 'evo' with:
+#   Python 3.10, PyTorch 2.7.0 (CUDA 12.8), FlashAttention 2.7.4,
+#   evo-model, biopython, pandas, scipy, matplotlib, seaborn
+
 conda activate evo
 ```
 
-## 2. Data
+`setup_evo_env.sh` installs the `evo-model` package which pulls Evo-1-8k-base weights
+from HuggingFace on first use. No manual weight download is required. Set
+`HF_HOME` to a path with sufficient disk space (~30 GB) before running if the default
+HuggingFace cache directory is on a small filesystem.
+
+All scripts are designed to be run from the repo root directory.
+
+---
+
+## 2. Data preparation
+
+### 2a. Attack corpus
+
+The attack corpus consists of 910 human-pathogenic virus assemblies sourced from NCBI Virus,
+covering Influenza A, SARS-CoV-2, Ebola, HIV, Dengue, West Nile, and related pathogens.
 
 ```bash
-# Attack corpus (910 human-pathogenic virus assemblies, NCBI Virus)
-bash data/download_scripts/download_attack.sh      # → data/attack.fasta
-python scripts/split_attack_fasta.py               # → data/attack_train.fasta (544)
-                                                   #   data/attack_heldout.fasta (366)
-# Split is by NCBI accession: zero sequences shared between files.
+# Download all 910 assemblies from NCBI Virus  (~3.4 GB, requires internet)
+bash data/download_scripts/download_attack.sh
+# Output: data/attack.fasta
 
-# HVUE downstream benchmark (HuggingFace: duttaprat/HVUE)
+# Genus-stratified accession-disjoint train / held-out split
+python scripts/split_attack_fasta.py
+# Output: data/attack_train.fasta   (544 assemblies, ~25 Mnt)
+#         data/attack_heldout.fasta (366 assemblies, ~16.8 Mnt)
+```
+
+The split is genus-stratified so that the held-out set tests generalisation across genera,
+not just within-genus interpolation. Split reproducibility is fixed by `--seed 42` (default).
+
+### 2b. HVUE downstream benchmark
+
+The HVUE benchmark ([Dutta et al. 2026](https://huggingface.co/datasets/duttaprat/HVUE))
+provides three binary classification tasks: Host Tropism, Pathogenicity, Transmissibility.
+Each task has a training (n=3000) and validation (n=2000) split.
+
+```bash
 python -c "
 from datasets import load_dataset
-for task in ['Host_Tropism','Pathogenicity','Transmissibility']:
-    ds = load_dataset('duttaprat/HVUE', task)
-    ds.save_to_disk(f'data/hvue/{task}')
+for task in ['Host_Tropism', 'Pathogenicity', 'Transmissibility']:
+    load_dataset('duttaprat/HVUE', task).save_to_disk(f'data/hvue/{task}')
 "
+# Output: data/hvue/{Host_Tropism,Pathogenicity,Transmissibility}/
 ```
 
-## 3. Lock
+---
+
+## 3. Locking
+
+Apply SpecDef to Evo-1-8k-base, producing two locked checkpoints: α=10⁴ (weaker lock,
+used for Attacks A, D, E, G) and α=3×10⁴ (stronger lock, used for Attacks B, C, F, H, I, J).
 
 ```bash
-for cfg in configs/lock/alpha*.yaml; do
-  CUDA_VISIBLE_DEVICES=0 python scripts/lock_specdef.py "$cfg"
-done
+CUDA_VISIBLE_DEVICES=0 python scripts/lock_specdef.py configs/lock/alpha10k.yaml
+# Output: results/lock_alpha10k/model_specdef.pt
+
+CUDA_VISIBLE_DEVICES=0 python scripts/lock_specdef.py configs/lock/alpha30k.yaml
+# Output: results/lock_alpha30k/model_specdef.pt
 ```
 
-Produces `results/lock_alpha{10k,30k,100k,1M}/model_specdef.pt`.
-Each checkpoint is function-equivalent to pretrained (C·W̃ = W to bf16 precision)
-but inflates the top-25 singular values in 32 output projections by α.
+**What locking does:** For each of the 32 write-side output projections (4096×4096), SpecDef
+computes the thin SVD W = UΣVᵀ, inflates the top 25 singular values by α (W̃ = U·diag(α·σ₁,...,
+σ₂₆,...·σᵣ)·Vᵀ), and constructs a compensation matrix C = U·(Σ·Σ̃⁻¹)·Uᵀ that exactly restores
+the forward pass: C·W̃·x = W·x. The inflated singular values raise the Hessian curvature along
+the dominant weight directions by α², forcing stable fine-tuning to use η ≤ 1/(α·σ₁)². For
+α=3×10⁴, this reduces the unlocked stable learning rate (10⁻⁵) to ≤10⁻⁶. The forward-pass
+drift after locking is verified to be <3×10⁻⁴ on the held-out corpus.
 
-## 4. Fine-tune
+---
+
+## 4. Fine-tuning (attack runs)
+
+All attack runs use the same shared training protocol: 8-bit AdamW (weight decay 0),
+gradient clipping to norm 1.0, fp32 precision, 1024-nt windows with 512-nt stride, batch
+size 1, gradient-accumulation steps 4, 25 000 steps, on a single NVIDIA A100 80 GB.
+This amounts to 102.4 M tokens per run (25 000 × 4 × 1024).
+
+The convenience wrapper `run_pipeline.sh` executes fine-tuning (Step 2) followed by
+PPL evaluation (Step 3a), HVUE embedding extraction (Step 3b), linear probe (Step 4),
+and bootstrap significance (Step 5) in one command:
 
 ```bash
-# Unlocked baseline (25 000 steps, lr=1e-5)
-CUDA_VISIBLE_DEVICES=0 python scripts/finetune.py configs/finetune/unlocked_25k.yaml
+# Usage: bash scripts/run_pipeline.sh <GPU_ID> <CONFIG_YAML>
 
-# Stable-LR locked sweep (lr ∝ 1/α, 25 000 steps)
-CUDA_VISIBLE_DEVICES=0 python scripts/finetune.py configs/finetune/locked_a10k_lr1e6_25k.yaml
-CUDA_VISIBLE_DEVICES=1 python scripts/finetune.py configs/finetune/locked_a30k_lr1e6_25k.yaml
-CUDA_VISIBLE_DEVICES=2 python scripts/finetune.py configs/finetune/locked_a100k_lr1e6_25k.yaml
-CUDA_VISIBLE_DEVICES=3 python scripts/finetune.py configs/finetune/locked_a1M_lr1e7_25k.yaml
+# Reference: unlocked fine-tuning ceiling
+bash scripts/run_pipeline.sh 0 configs/finetune/unlocked_25k_v2.yaml
 
-# Layer-injection bypass (B-only: 32 bypass layers, <0.5% params, 25 000 steps)
-CUDA_VISIBLE_DEVICES=0 python scripts/finetune.py configs/finetune/bypass_a10k_25k.yaml
+# Attack A — Naive FT, α=10⁴, η=1e-6
+bash scripts/run_pipeline.sh 0 configs/finetune/locked_a10k_lr1e6_25k.yaml
+
+# Attack B — Naive FT, α=3×10⁴, η=1e-6
+bash scripts/run_pipeline.sh 0 configs/finetune/locked_a30k_lr1e6_25k.yaml
+
+# Attack C — Aggressive FT, α=3×10⁴, η=1e-4  (diverges at step ~109, no checkpoint produced)
+bash scripts/run_pipeline.sh 0 configs/finetune/locked_a10k_lr1e4.yaml
+
+# Attack D — LoRA r=16, α=10⁴
+bash scripts/run_pipeline.sh 0 configs/finetune/lora_a10k_25k.yaml
+
+# Attack E — Inserted-layer bypass, α=10⁴
+bash scripts/run_pipeline.sh 0 configs/finetune/bypass_a10k_25k_v2.yaml
+
+# Attack F — Inserted-layer bypass, α=3×10⁴
+bash scripts/run_pipeline.sh 0 configs/finetune/bypass_a30k_25k.yaml
+
+# Attack G — SVD-chain k=3, α=10⁴
+bash scripts/run_pipeline.sh 0 configs/finetune/theorem8_a10k_k3_25k.yaml
+
+# Attack H — SVD-chain k=1, α=3×10⁴
+bash scripts/run_pipeline.sh 0 configs/finetune/theorem8_a30k_k1_25k.yaml
+
+# Attack I — SVD-chain k=3, α=3×10⁴
+bash scripts/run_pipeline.sh 0 configs/finetune/theorem8_a30k_k3_25k.yaml
+
+# Attack J — SVD-chain k=5, α=3×10⁴
+bash scripts/run_pipeline.sh 0 configs/finetune/theorem8_a30k_k5_25k.yaml
 ```
 
-All configs train on `data/attack_train.fasta`, validate on `data/attack_heldout.fasta`.
-Outputs go to `results/<run_name>/model_best.pt`.
+Runs can be parallelised across GPUs (one config per device). Logs are written to
+`logs/runs/<config_name>.log`. The best checkpoint (by validation loss) is saved to
+`results/<run_name>/model_best.pt`.
 
-## 5. Evaluate
+**To run fine-tuning only** (skip PPL/HVUE evaluation):
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/finetune.py \
+    --config configs/finetune/locked_a30k_lr1e6_25k.yaml
+```
+
+**Multi-GPU fine-tuning** (e.g. 4 GPUs, data-parallel):
+
+```bash
+bash scripts/run_pipeline.sh 0 configs/finetune/theorem8_a30k_k5_25k.yaml 4
+```
+
+---
+
+## 5. Evaluation
 
 ### 5.1 Held-out perplexity
 
+Computes held-out viral PPL for all checkpoints found in `results/`. Results are
+appended to a single registry CSV so the command is safe to re-run incrementally.
+
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/attack_ppl.py --n_batches 64
-# → results/attack_heldout_ppl.csv  (name, ckpt, val_loss, val_ppl)
+# Output: results/attack_heldout_ppl.csv  (columns: name, ckpt, val_loss, val_ppl)
 ```
 
-### 5.2 HVUE linear probe
+To evaluate a specific new checkpoint without touching the full registry:
 
 ```bash
-# Extract 4096-dim mean-pooled residual-stream embeddings for every ckpt × task × split
-for ckpt in pretrained \
-            results/ft_unlocked_25k/model_best.pt \
-            results/ft_locked_a10k_lr1e6_25k/model_best.pt \
-            results/ft_locked_a30k_lr1e6_25k/model_best.pt \
-            results/ft_locked_a100k_lr1e6_25k/model_best.pt \
-            results/ft_locked_a1M_lr1e7_25k/model_best.pt \
-            results/ft_bypass_a10k_25k_locked/model_best.pt; do
-  for task in Host_Tropism Pathogenicity Transmissibility; do
-    for split in train validation; do
-      CUDA_VISIBLE_DEVICES=0 python scripts/hvue_extract_one_ckpt.py \
-        --ckpt "$ckpt" --task "$task" --split "$split" \
-        --out results/hvue_embeddings/
-    done
-  done
-done
-
-# ℓ₂-regularised logistic regression probe (C ∈ {0.01,0.1,1,10}, val AUROC)
-python scripts/hvue_probe.py \
-  --emb_dir results/hvue_embeddings \
-  --out results/hvue_probe.csv
-
-# Paired bootstrap significance (n=2000) vs pretrained baseline
-python scripts/hvue_significance.py \
-  --probe_csv results/hvue_probe.csv \
-  --out results/hvue_significance.csv
+TMP=$(mktemp --suffix=.csv)
+echo "name,ckpt" > "$TMP"
+echo "my_run,results/my_run/model_best.pt" >> "$TMP"
+CUDA_VISIBLE_DEVICES=0 python scripts/attack_ppl.py \
+    --n_batches 64 --ckpts_csv "$TMP" --out results/attack_heldout_ppl.csv
 ```
 
-### 5.3 Figures
+### 5.2 HVUE embedding extraction
+
+Extracts 4096-dim mean-pooled final-layer activations for every checkpoint × task × split
+combination. (This step is the most time-consuming; ~10–15 min per checkpoint on an A100.)
+
+```bash
+# Extract embeddings for all checkpoints listed in the paper (adjust CKPT_NAME as needed)
+for CKPT_NAME in pretrained \
+    ft_unlocked_25k_v2_unlocked \
+    ft_locked_a10k_lr1e6_25k_locked \
+    ft_locked_a30k_lr1e6_25k_locked \
+    ft_lora_a10k_25k_locked \
+    ft_bypass_a10k_25k_v2_locked \
+    ft_bypass_a30k_25k_locked \
+    ft_theorem8_a10k_k3_25k_locked \
+    ft_theorem8_a30k_k1_25k_locked \
+    ft_theorem8_a30k_k3_25k_locked \
+    ft_theorem8_a30k_k5_25k_locked; do
+  CKPT_PATH="results/${CKPT_NAME}/model_best.pt"
+  [[ "$CKPT_NAME" == "pretrained" ]] && CKPT_PATH="pretrained"
+  CUDA_VISIBLE_DEVICES=0 python scripts/hvue_extract_one_ckpt.py \
+      --ckpt_name "$CKPT_NAME" \
+      --ckpt_path "$CKPT_PATH"
+done
+# Output: results/hvue_embeddings/<ckpt_name>_<task>_{train,validation}.npz
+```
+
+### 5.3 HVUE linear probe
+
+Trains ℓ₂-regularised linear SVM probes (C swept over {0.01, 0.1, 1, 10} by 5-fold CV)
+for each (checkpoint, task) pair and writes AUROC, accuracy, F1, and MCC.
+
+```bash
+python scripts/hvue_probe.py \
+    --emb_dir results/hvue_embeddings \
+    --out results/hvue_probe.csv
+# Output: results/hvue_probe.csv  (columns: ckpt, task, auroc, acc, f1, mcc, ...)
+```
+
+### 5.4 Statistical significance
+
+Paired bootstrap significance test (n=2000 resamples) comparing each checkpoint against
+the pretrained baseline on each HVUE task.
+
+```bash
+python scripts/hvue_significance.py \
+    --emb_dir results/hvue_embeddings \
+    --n_boot 2000
+# Output: printed table of p-values per (ckpt, task)
+```
+
+### 5.5 Figures
+
+Regenerates all paper and supplement figures from the results CSVs. Outputs are written
+to `paper/` as both PDF and PNG.
 
 ```bash
 python scripts/make_paper_figures.py
-# writes: results/figures/fig1_main.pdf, results/figures/fig_s1_training_curves.pdf
+# Outputs (in paper/):
+#   fig1_scatter.{pdf,png}          — PPL vs AUROC operating-point scatter (Fig 1)
+#   fig2_main_bars.{pdf,png}        — representative-conditions bar chart (Fig 2)
+#   fig3_kablation.{pdf,png}        — SVD-chain k-ablation (Fig 3)
+#   fig_s1_training_curves.{pdf,png} — training dynamics (Supp. Fig. S1)
 ```
 
-### 5.4 Sharp-minimum sensitivity diagnostic
+### 5.6 Forward-pass preservation diagnostic
+
+Verifies that the locked checkpoint is function-equivalent to pretrained by measuring
+perplexity drift of the fused C·W̃ product vs. the original W.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/precision_diag.py \
-  --ckpt results/lock_alpha100k/model_specdef.pt \
-  --sigmas 1e-7 1e-6 1e-5 1e-4 1e-3
+    --ckpt results/lock_alpha30k/model_specdef.pt \
+    --sigmas 1e-7 1e-6 1e-5 1e-4 1e-3
 ```
+
+### 5.7 Computational overhead profiling
+
+Measures per-step wall-clock time and trainable parameter counts for each configuration.
+These numbers appear in Supplementary Table S1 of the paper.
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/profile_attack_overhead.py
+```
+
+---
 
 ## Reproducibility notes
 
-- All FT runs: 8-bit AdamW, weight decay 0, gradient clip 1.0, bfloat16, batch 1, grad accum 4, seq len 1024, no warmup or decay, gradient checkpointing.
-- Stable LR per α: 1e-6 for α∈{10⁴,3×10⁴,10⁵}; 1e-7 for α=10⁶ (follows η∝1/σ_max scaling from Rosati et al.).
-- HVUE probe: n_train=3 000, n_val=2 000, fixed seed 42. Probe C selected on val AUROC.
-- All bootstrap tests: n=2 000 resamples, paired on the same validation examples.
-- Hardware: NVIDIA A100 80 GB SXM. Locked FT ≈ 5.17 s/step; unlocked FT ≈ 3.03 s/step; bypass B-only ≈ 2.51 s/step (~18 GB peak VRAM).
+| Parameter | Value |
+|---|---|
+| Optimizer | 8-bit AdamW (bitsandbytes) |
+| Weight decay | 0 |
+| Gradient clip | norm 1.0 |
+| Precision | fp32 (SVD-chain factor matmuls require fp32: σ_max(W̃) ≈ α·σ_max(W) ≈ 10⁵ exceeds bf16 range of 65 504) |
+| Sequence length | 1024 nt, stride 512 nt |
+| Batch size | 1 sequence, grad accum 4 (effective batch = 4096 tokens) |
+| Training steps | 25 000 |
+| Tokens per run | 25 000 × 4 × 1024 = 102.4 M |
+| LR — unlocked baseline | 1×10⁻⁵ |
+| LR — naive FT, LoRA, bypass, SVD-chain | 1×10⁻⁶ (locked α=10⁴ and α=3×10⁴) |
+| LR — SVD-chain k=1 | 5×10⁻⁶ (tighter clip for single free-matrix initialisation) |
+| LR — aggressive FT (Attack C) | 1×10⁻⁴ (diverges at step ~109) |
+| HVUE probe | n_train=3000, n_val=2000, C ∈ {0.01, 0.1, 1, 10}, seed 42 |
+| Bootstrap | n=2000, paired on same validation examples |
+| Hardware | 1× NVIDIA A100 80 GB |
+
+**SpecDef locking targets:** All 32 write-side output projections of Evo-1-8k-base — the 29
+`out_filter_dense` layers in Hyena blocks and the 3 `inner_mha_cls.out_proj` layers in the
+multi-head attention blocks. Top-25 singular values inflated in each.
+
+**SVD-chain initialisation:** Each factor matrix Lᵢ is initialised from the k-th approximate
+matrix root of W̃, obtained by computing the full SVD of W̃ and taking Σ^(1/k). This ensures
+L_k·...·L_1 ≈ W̃ at step 0, so perplexity at the start of SVD-chain training matches the
+locked (not pretrained) baseline.
+
+---
 
 ## Citation
 
 ```bibtex
-@article{evo-locking-2026,
-  title   = {Locking genomic foundation models with spectral deformation},
-  author  = {Karatzikos, Aris and Vasilopoulou, Aggeliki and Mouratidis, Ioannis and Georgakopoulos-Soares, Ilias},
+@article{glm-locking-2026,
+  title   = {Spectral locking as a defence for open-weight genomic foundation models},
+  author  = {Karatzikos, Aris and Vasilopoulou, Aggeliki and Chan, Candace SY and
+             Mouratidis, Ioannis and Georgakopoulos-Soares, Ilias},
   journal = {Bioinformatics},
   year    = {2026}
 }

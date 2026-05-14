@@ -91,23 +91,33 @@ class SpecDefLinear(nn.Module):
 
 
 class BypassSpecDefLinear(nn.Module):
-    """Theorem 8 layer-injection bypass wrapper.
+    """Layer-injection bypass (Rosati et al. Theorem 8, black-box attacker).
 
-    Wraps a frozen SpecDefLinear with a trainable bypass matrix B (d_out × d_out),
-    initialized to identity. Forward pass:
+    Wraps a frozen SpecDefLinear with a trainable bypass matrix B (d_out × d_out).
+    Forward pass:
 
         h   = W_fused(x)     [single bf16 matmul: W_fused = C @ W̃, precomputed at init]
         out = B(h)           [trainable — gradients flow back through h to x]
 
-    W_fused is precomputed once at init as (C @ W̃).to(bf16), replacing the original
-    2× f32 matmuls with a single bf16 matmul — identical forward output but ~3× faster
-    and with correct ∂h/∂x gradient flow (no torch.no_grad wrapping needed; C and W̃
-    are frozen via requires_grad=False set by freeze_all_except).
+    W_fused = C @ W̃ is precomputed once at init and stored frozen in bf16, replacing
+    the original two sequential fp32 matmuls in SpecDefLinear with a single bf16 matmul.
+    This is numerically equivalent (C·W̃ = W to bf16 precision) and ~3× faster.
+    Gradients flow through the fused layer without any no_grad wrapping because
+    fused.weight has requires_grad=False.
 
-    This is the black-box attacker construction from Rosati et al. Theorem 8:
-    one injected layer per locked layer, linear model-size increase.  The bypass
-    routes gradient around the inflated C matrix, making stable fine-tuning
-    possible regardless of α.
+    B is initialised to the identity matrix so the model is function-equivalent to
+    the locked checkpoint at step 0. Only B trains; W_fused and C are frozen.
+
+    Construction cost: one SVD per locked layer, done on CPU in seconds.
+    Parameter overhead: 32 × 4096² × 2 bytes ≈ 1.07 GB (< 0.5% of Evo-7B).
+
+    INIT BUG HISTORY (fixed):
+    The original implementation called `nn.init.eye_(self.bypass.weight.float())`,
+    which creates a *detached copy* of the bf16 weight and fills the copy — the
+    actual parameter is left with Kaiming-uniform random values.  This caused
+    step-0 val_ppl = 637 instead of ~3.75 and rendered all 25k training steps
+    ineffective (the model spent the run recovering B toward identity rather than
+    learning).  Fixed by calling `nn.init.eye_(self.bypass.weight)` directly.
     """
     def __init__(self, specdef_layer: SpecDefLinear):
         super().__init__()
@@ -131,11 +141,13 @@ class BypassSpecDefLinear(nn.Module):
         if bias is not None:
             self.fused.bias = nn.Parameter(bias.bfloat16(), requires_grad=False)
 
-        # Identity init: B = I  =>  B(h) = h at step 0
+        # Identity init: B = I  =>  B(h) = h at step 0.
+        # BUG FIX: must call eye_ directly on the parameter tensor. Calling
+        # .float() first returns a detached copy — eye_ would fill the copy,
+        # leaving the actual bfloat16 weight with random Kaiming uniform init.
         self.bypass = nn.Linear(d_out, d_out, bias=False, device=device,
                                 dtype=torch.bfloat16)
-        nn.init.eye_(self.bypass.weight.float())
-        self.bypass.weight.data = self.bypass.weight.data.bfloat16()
+        nn.init.eye_(self.bypass.weight)   # 0s and 1s are exact in bfloat16
 
     def forward(self, x):
         # Single bf16 matmul through frozen W_fused; ∂h/∂x flows normally.
@@ -262,13 +274,17 @@ class Theorem8SpecDefLinear(nn.Module):
                 self.comp.weight,
                 bias_arg,
             )
-        # General k path (not gradient-checkpointing optimised — k=2 is used in practice)
+        # General k path: sequential float32 activation application.
+        # O(k × B×T × d²) vs old O(k × d³) float64 weight product — ~24× faster.
+        # Must use float32 (not bf16): σ_max(W̃) up to 28k generates intermediate
+        # activations of magnitude ~28k before C compresses by 1/α=1/10k.
+        # bf16 rounds magnitude-28k values to ±219 per element → blows up val_loss.
+        # float32 is required for numerically accurate C@L_k@...@L_1(x) = W(x) at init.
         import torch.nn.functional as _F
         with torch.autocast(device_type="cuda", enabled=False):
-            w = self.factors[0].weight.double()
-            for fac in self.factors[1:]:
-                w = fac.weight.double() @ w
-            h = _F.linear(x.float(), w.float(), None)
+            h = x.float()
+            for fac in self.factors:
+                h = _F.linear(h, fac.weight.float(), None)
             c_w = self.comp.weight
             out = _F.linear(h, c_w.float() if c_w.dtype != torch.float32 else c_w, None)
             if self.bias is not None:

@@ -1,0 +1,35 @@
+mode: locked
+run_name: ft_theorem8_a10k_k3_25k
+data_path: data/attack_train.fasta
+val_data_path: data/attack_heldout.fasta
+train_steps: 25000
+lr: 1.0e-05
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+weight_decay: 0.0
+warmup_fraction: 0.0
+target_blocks: 32
+# Proper Theorem 8 SVD-factorization attack (white-box).
+# Replaces each SpecDefLinear(W̃, C) with k=3 jointly-trainable SVD factors:
+#   W̃ = L3 @ L2 @ L1   where σ₁(each factor) = σ₁(W̃)^(1/3) ≈ (α·σ₁(W))^(1/3)
+# For lock_alpha10k (α=10000): σ₁(W̃) ≈ 107300, σ/factor ≈ 47.5  (near-unlocked)
+# vs k=2: σ/factor ≈ 328 → prior k=2 runs diverged to NaN.
+# C is frozen (freeze_comp=true); only the k factor matrices train.
+# Expected outcome: same convergence as unlocked-FT (PPL ~3.48, AUROC ~0.867).
+theorem8_injection: true
+theorem8_k: 3
+freeze_comp: true
+use_gradient_checkpointing: true
+save_checkpoint: true
+checkpoint_every: 2000
+plateau_window: 10
+plateau_delta: 0.002
+train_fraction: 0.9
+seed: 42
+locked_ckpt: results/lock_alpha10k/model_specdef.pt
+results_dir: results/ft_theorem8_a10k_k3_25k

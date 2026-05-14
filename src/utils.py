@@ -1,4 +1,4 @@
-"""Shared utilities for evo-locking experiments."""
+"""Shared utilities for glm-locking experiments."""
 
 import os
 import csv
@@ -111,6 +111,11 @@ class FinetuneConfig:
     # The locked W̃ and C are fully frozen; only B and non-locked model params train.
     # One injected layer per locked layer = linear model size increase.
     layer_injection: bool = False
+    # When layer_injection=True, controls whether the fused C@W̃ weights are frozen.
+    # Default True = B-only bypass (original behaviour).
+    # False = full-unfreeze experiment: fused weights are trainable alongside B and the
+    # backbone, so the conditioning obstruction resolves under gradient descent.
+    freeze_injected_fused: bool = True
     # Proper Theorem 8 SVD-factorization attack (white-box).
     # Replaces each SpecDefLinear with k jointly-trainable SVD factors of W̃,
     # each initialized to σ₁ = α^(1/k). C stays frozen. Must also set freeze_comp: true.
@@ -125,6 +130,16 @@ class FinetuneConfig:
     lora_rank: int = 16
     lora_alpha: float = 32.0
     lora_target_substrings: tuple = (".linear",)  # match SpecDef-wrapped Linear by default
+    # If True (default), cast frozen C matrices to bfloat16 after freeze_comp.
+    # WARNING: for runs that keep raw SpecDefLinear (no bypass/theorem8 injection),
+    # this causes catastrophic error in specdef_fused_eval because:
+    #   fused_w = C_bf16.float() @ W̃  → error amplified by σ_max(W̃)=215,339
+    # Set False for LoRA runs to keep C in float32 and get correct specdef eval.
+    cast_comp_bf16: bool = True
+    # Resume training from a periodic checkpoint (state_dict .pt file).
+    # Loaded AFTER lock + attack injection, so SVD-factor keys are already present.
+    # Training restarts from step 0 but with weights initialised from the checkpoint.
+    resume_from: str | None = None
 
 
 @dataclass
@@ -556,6 +571,15 @@ def maybe_load_locked_checkpoint(model, ckpt_path: str | None):
     # Detect SpecDef checkpoint: look for compensation keys (.comp.weight)
     specdef_keys = [k for k in state_dict if ".comp.weight" in k]
     factor_keys = [k for k in state_dict if ".factors." in k]
+    # Detect bypass checkpoint: BypassSpecDefLinear saves .fused.weight + .bypass.weight
+    # (no .comp.weight keys — C was pre-fused into .fused.weight at injection time)
+    bypass_keys = [k for k in state_dict if ".bypass.weight" in k]
+
+    # Bypass checkpoint: inject FusedBypass modules then load weights
+    if bypass_keys and not specdef_keys:
+        print(f"  Detected BypassSpecDef checkpoint ({len(bypass_keys)} bypass layers)")
+        _apply_bypass_checkpoint(model, state_dict, bypass_keys)
+        return
 
     # Theorem8 checkpoint: fuse SVD factors back into single weight matrices
     if factor_keys:
@@ -591,6 +615,54 @@ def maybe_load_locked_checkpoint(model, ckpt_path: str | None):
     else:
         missing, unexpected = model.load_state_dict(state_dict, strict=False)
         print(f"  Missing keys: {len(missing)}, Unexpected keys: {len(unexpected)}")
+
+
+def _apply_bypass_checkpoint(model, state_dict: dict, bypass_keys: list[str]):
+    """Load a BypassSpecDef checkpoint.
+
+    BypassSpecDefLinear saves two sub-modules:
+        .fused.weight  — frozen C@W̃ (bfloat16, precomputed at injection)
+        .bypass.weight — trained B matrix (bfloat16)
+
+    Neither key matches the pretrained model's structure, so ordinary
+    load_state_dict would silently ignore them.  This function injects a
+    minimal _FusedBypassLinear shim for each detected (block, pattern) pair,
+    then loads the full state dict.
+    """
+    import re
+    from torch import nn
+    from scripts.lock_specdef import _get_nested, _set_nested
+
+    class _FusedBypassLinear(nn.Module):
+        """Minimal shim that mirrors BypassSpecDefLinear's state-dict layout."""
+        def __init__(self, d_in, d_out, device, dtype=torch.bfloat16):
+            super().__init__()
+            self.fused  = nn.Linear(d_in, d_out, bias=False, device=device, dtype=dtype)
+            self.bypass = nn.Linear(d_out, d_out, bias=False, device=device, dtype=dtype)
+
+        def forward(self, x):
+            h = self.fused(x.to(self.fused.weight.dtype))
+            return self.bypass(h).to(x.dtype)
+
+    modified = []
+    for key in bypass_keys:
+        m = re.match(r"blocks\.(\d+)\.(.+)\.bypass\.weight", key)
+        if m:
+            modified.append((int(m.group(1)), m.group(2)))
+
+    for idx, pattern in sorted(set(modified)):
+        fused_key = f"blocks.{idx}.{pattern}.fused.weight"
+        d_out, d_in = state_dict[fused_key].shape
+        orig = _get_nested(model.blocks[idx], pattern)
+        device = next(orig.parameters()).device if orig is not None else "cpu"
+        shim = _FusedBypassLinear(d_in, d_out, device, dtype=state_dict[fused_key].dtype)
+        _set_nested(model.blocks[idx], pattern, shim)
+
+    missing, unexpected = model.load_state_dict(state_dict, strict=False)
+    print(f"  Bypass loaded: {len(modified)} layers  |  "
+          f"Missing={len(missing)}, Unexpected={len(unexpected)}")
+    if unexpected:
+        print(f"  WARNING unexpected keys: {unexpected[:5]}")
 
 
 def _apply_specdef_checkpoint(model, state_dict: dict, specdef_keys: list[str]):
@@ -703,7 +775,13 @@ def maybe_enable_gradient_checkpointing(model, enable: bool):
             return
         except Exception:
             pass
-    # Manual: monkey-patch each block's forward with torch.utils.checkpoint
+    # Manual: monkey-patch each block's forward with torch.utils.checkpoint.
+    # NOTE: use_reentrant=False is required because the block forward uses **kwargs
+    # (inference_params, padding_mask) and use_reentrant=True does not support kwargs.
+    # KNOWN ISSUE: use_reentrant=False installs saved_tensors_hooks that can corrupt the
+    # forward pass when trainable submodules (e.g., LoRALinear) are injected AFTER the
+    # hooks are installed in the block wrapper.  Workaround: set use_gradient_checkpointing
+    # to False in the config for LoRA runs (31M trainable params → no memory benefit).
     if hasattr(model, "blocks"):
         from torch.utils.checkpoint import checkpoint as _ckpt
 

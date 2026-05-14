@@ -1,20 +1,27 @@
 #!/bin/bash
-# Run a complete per-checkpoint pipeline serially on a single GPU:
-#   1) Fine-tune from a config
-#   2) Compute held-out attack PPL on the resulting ckpt
-#   3) Extract HVUE embeddings (3 tasks x 2 splits) for downstream probe
+# Run a complete pipeline: fine-tune → PPL eval → HVUE embeddings → probe.
+# Intermediate checkpoints (checkpoint_every in config) are also evaluated.
 #
-# All three steps share one GPU and run sequentially in the same tmux job.
-# Logs go to logs/runs/<run_name>.log
+# Usage (single GPU):   scripts/run_pipeline.sh <gpu_id> <config_yaml>
+# Usage (multi-GPU):    scripts/run_pipeline.sh <gpu_id> <config_yaml> <nproc>
 #
-# Usage:  scripts/run_pipeline.sh <gpu_id> <config_yaml>
+#   gpu_id  – GPU to use for single-GPU steps (PPL, extraction, probe); also
+#              used as the first GPU when running multi-GPU fine-tuning.
+#   nproc   – number of GPUs for torchrun fine-tuning (default: 1 = no torchrun)
+#
+# Example (8 GPUs, all GPUs visible):
+#   scripts/run_pipeline.sh 0 configs/finetune/bypass_a10k_full_unfreeze_25k.yaml 8
+#
+# Logs go to logs/runs/<config_name>.log
 
 set -e
 set -o pipefail
 
 GPU=${1:?gpu id}
 CFG=${2:?finetune config yaml}
+NPROC=${3:-1}   # number of GPUs for fine-tuning (1 = single-process, >1 = torchrun)
 PY=/home/nvidia/miniconda3/envs/evo/bin/python
+TORCHRUN=/home/nvidia/miniconda3/envs/evo/bin/torchrun
 
 cd "$(dirname "$0")/.."
 
@@ -33,12 +40,18 @@ CKPT="results/${ACTUAL_RUN_NAME}/model_best.pt"
 mkdir -p logs/runs results
 
 echo "==================================================" | tee -a "$LOG"
-echo "[$(date)] PIPELINE START   GPU=$GPU  cfg=$CFG  run=$ACTUAL_RUN_NAME" | tee -a "$LOG"
+echo "[$(date)] PIPELINE START   GPU=$GPU  nproc=$NPROC  cfg=$CFG  run=$ACTUAL_RUN_NAME" | tee -a "$LOG"
 echo "==================================================" | tee -a "$LOG"
 
 # ---- Step 1: fine-tune ---------------------------------------------------
-echo "[$(date)] >>> Step 1: fine-tune" | tee -a "$LOG"
-CUDA_VISIBLE_DEVICES=$GPU $PY -u scripts/finetune.py --config "$CFG" 2>&1 | tee -a "$LOG"
+echo "[$(date)] >>> Step 1: fine-tune (nproc=$NPROC)" | tee -a "$LOG"
+if [[ "$NPROC" -gt 1 ]]; then
+  # Multi-GPU: use torchrun; all GPUs must be visible (no CUDA_VISIBLE_DEVICES restriction)
+  $TORCHRUN --nproc_per_node="$NPROC" --master_port=29504 \
+    scripts/finetune.py --config "$CFG" 2>&1 | tee -a "$LOG"
+else
+  CUDA_VISIBLE_DEVICES=$GPU $PY -u scripts/finetune.py --config "$CFG" 2>&1 | tee -a "$LOG"
+fi
 
 if [ ! -f "$CKPT" ]; then
   echo "[$(date)] ERROR: expected ckpt not found at $CKPT" | tee -a "$LOG"
