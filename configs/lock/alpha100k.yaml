@@ -1,0 +1,11 @@
+# SpecDef locking — α=10^5 (stronger than current α=3×10^4 primary lock)
+# Tests whether higher α shifts the Pareto front further from unlocked operating point.
+run_name: lock_alpha100k
+alpha: 100000.0
+top_k: 25
+target_blocks: 32
+num_target_layers: 0
+target_layer_patterns:
+  - out_filter_dense
+  - inner_mha_cls.out_proj
+retain_data_path: data/retain.fasta

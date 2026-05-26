@@ -146,13 +146,20 @@ def profile_one(label, load_kwargs, device, pretrained_trainable, base_mem_mib):
     amp_dtype = torch.bfloat16
     with torch.no_grad():
         with torch.amp.autocast(device_type="cuda", dtype=amp_dtype):
-            _ = model(batch)
+            _out, _ = model(batch)
     fwd_mem = torch.cuda.max_memory_allocated(device) / 1024**2
 
     # ---- Measure memory + time for forward+backward -----------------------
-    optimizer = torch.optim.AdamW(
-        [p for p in model.parameters() if p.requires_grad],
-        lr=1e-6) if trainable > 0 else None
+    # Use bitsandbytes 8-bit AdamW to match finetune.py exactly
+    try:
+        import bitsandbytes as bnb
+        optimizer = bnb.optim.AdamW8bit(
+            [p for p in model.parameters() if p.requires_grad],
+            lr=1e-6) if trainable > 0 else None
+    except ImportError:
+        optimizer = torch.optim.AdamW(
+            [p for p in model.parameters() if p.requires_grad],
+            lr=1e-6) if trainable > 0 else None
 
     step_times = []
     torch.cuda.reset_peak_memory_stats(device)
@@ -161,7 +168,7 @@ def profile_one(label, load_kwargs, device, pretrained_trainable, base_mem_mib):
         batch = make_batch(tokenizer, device)
         t0 = time.perf_counter()
         with torch.amp.autocast(device_type="cuda", dtype=amp_dtype):
-            logits = model(batch)
+            logits, _ = model(batch)
             # causal LM loss on the batch
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = batch[..., 1:].contiguous()
@@ -180,8 +187,9 @@ def profile_one(label, load_kwargs, device, pretrained_trainable, base_mem_mib):
     peak_mem = torch.cuda.max_memory_allocated(device) / 1024**2
     mean_step_ms = sum(step_times) / len(step_times)
 
-    del model
+    del model, batch
     torch.cuda.empty_cache()
+    torch.cuda.synchronize(device)
 
     return {
         "label":             label,
@@ -215,25 +223,57 @@ def main():
     batch0 = torch.randint(0, tok0.vocab_size, (BATCH, SEQ_LEN), device=device)
     with torch.no_grad():
         with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
-            _ = model0(batch0)
+            _, _ = model0(batch0)
     base_mem = torch.cuda.max_memory_allocated(device) / 1024**2
     print(f"  pretrained_trainable={pretrained_trainable:,}  base_fwd_mem={base_mem:.0f} MiB")
     del model0
     torch.cuda.empty_cache()
 
-    # ---- Profile all attacks -----------------------------------------------
+    # ---- Profile all attacks (each in isolated subprocess) ----------------
     rows = []
     for label, kwargs in ATTACKS:
         print(f"\n=== {label} ===")
-        try:
-            row = profile_one(label, kwargs, device, pretrained_trainable, base_mem)
-            rows.append(row)
+        # Write kwargs to a temp file and launch a subprocess to avoid
+        # CUDA memory fragmentation between configs
+        import subprocess, tempfile, pickle
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tf:
+            tmp_in = tf.name
+            pickle.dump({"label": label, "kwargs": kwargs,
+                         "device": device,
+                         "pretrained_trainable": pretrained_trainable,
+                         "base_mem_mib": base_mem}, tf)
+        tmp_out = tmp_in + ".out.pkl"
+        worker_path = os.path.join(ROOT, "scripts", "profile_attack_overhead_worker.py")
+        script = (
+            "import sys, pickle, os; "
+            "sys.path.insert(0, %r); "
+            "sys.path.insert(0, %r); "
+            "os.chdir(%r); "
+            "exec(open(%r).read()); "
+            "run_worker(%r, %r)"
+        ) % (ROOT, os.path.join(ROOT, "scripts"), ROOT, worker_path, tmp_in, tmp_out)
+        env = os.environ.copy()
+        env["PYTHONPATH"] = ROOT
+        env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, env=env,
+            cwd=ROOT
+        )
+        if os.path.exists(tmp_out):
+            with open(tmp_out, "rb") as f:
+                row = pickle.load(f)
+            os.unlink(tmp_out)
+        else:
+            row = {"label": label, "error": result.stderr[-500:] if result.stderr else "no output"}
+        os.unlink(tmp_in)
+        rows.append(row)
+        if "error" in row:
+            print(f"  ERROR: {row['error'][-200:]}")
+        else:
             print(f"  trainable={row['trainable_params_M']}M (+{row['extra_params_M']}M)"
-                  f"  peak_mem={row['peak_mem_MiB']}MiB"
+                  f"  peak_mem={row['peak_mem_MiB']:.0f}MiB"
                   f"  step={row['step_ms']}ms")
-        except Exception as e:
-            print(f"  ERROR: {e}")
-            rows.append({"label": label, "error": str(e)})
 
     # ---- Write CSV --------------------------------------------------------
     if rows:

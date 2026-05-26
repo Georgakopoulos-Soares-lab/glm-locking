@@ -1,0 +1,13 @@
+# SpecDef locking — α=3×10^5
+# Tests whether stronger curvature barrier can make η=10^-5 diverge.
+# At α=3×10^5, stable LR ~10^-8, so η=10^-5 is ~1000× above stable.
+# α=10^5 failed to block η=10^-5 (step 5800 still healthy). α=3×10^5 is next.
+run_name: lock_alpha300k
+alpha: 300000.0
+top_k: 25
+target_blocks: 32
+num_target_layers: 0
+target_layer_patterns:
+  - out_filter_dense
+  - inner_mha_cls.out_proj
+retain_data_path: data/retain.fasta

@@ -156,72 +156,13 @@ class BypassSpecDefLinear(nn.Module):
         return self.bypass(h).to(x.dtype)
 
 
-class _Theorem8Forward(torch.autograd.Function):
-    """Single-op autograd node: out = C( (L2 @ L1)(x) ) in float64 precision.
-
-    Wraps the entire W_eff = L2@L1 computation + two linear layers as ONE
-    autograd node, guaranteeing gradient checkpointing safety: `save_for_backward`
-    always saves the same 4 tensors (x, l1_w, l2_w, c_w) regardless of caching.
-
-    Float64 for W_eff (forward precision), float32 for backward (sufficient for grads).
-    k=2 only.
-    """
-    @staticmethod
-    def forward(ctx, x, l1_w, l2_w, c_w, bias):
-        w_eff = (l2_w.double() @ l1_w.double()).float()   # float64 → float32
-        h = torch.nn.functional.linear(x.float(), w_eff, None)
-        c = c_w.float()
-        out = torch.nn.functional.linear(h, c, None)
-        if bias is not None:
-            out = out + bias.float()
-        ctx.save_for_backward(x, l1_w, l2_w, c_w)
-        return out.to(x.dtype)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        x, l1_w, l2_w, c_w = ctx.saved_tensors
-        g = grad_output.float()
-        l1 = l1_w.float()
-        l2 = l2_w.float()
-        c = c_w.float()
-
-        # Backward through C: out = h @ c.T  →  dL/dh = g @ c
-        grad_h = g @ c                                         # (..., d_rank)
-
-        # Backward through W_eff = l2 @ l1: h = x @ W_eff.T
-        # dL/dx = dL/dh @ W_eff
-        w_eff_f32 = l2 @ l1                                    # float32 for backward
-        grad_x = (grad_h @ w_eff_f32).to(x.dtype) if x.requires_grad else None
-
-        # Weight gradients: dL/dW_eff = dL/dh^T @ x  (standard linear backward)
-        g_flat = grad_h.reshape(-1, grad_h.shape[-1])          # (N, d_rank)
-        x_flat = x.float().reshape(-1, x.shape[-1])            # (N, d_in)
-        grad_W_eff = g_flat.T @ x_flat                         # (d_rank, d_in)
-
-        # Chain to l1, l2: W_eff = l2 @ l1
-        grad_l1 = (l2.T @ grad_W_eff).to(l1_w.dtype)          # (d_rank, d_in)
-        grad_l2 = (grad_W_eff @ l1.T).to(l2_w.dtype)          # (d_out, d_rank)
-
-        return grad_x, grad_l1, grad_l2, None, None            # None: c_w frozen, bias frozen
-
-
 class Theorem8SpecDefLinear(nn.Module):
     """Theorem 8 SVD-factorization attack (white-box, proper implementation).
 
     Replaces SpecDefLinear(W̃, C) with k jointly-trainable factor layers
     initialized via SVD of W̃ so that each factor has σ₁ = (σ₁(W̃))^(1/k) ≈ α^(1/k).
-
-    For k=2 (default):
-        W̃ = L2 @ L1        where σ₁(L1) = σ₁(L2) = √α
-        forward: out = C( L2( L1(x) ) )
-        C is frozen; L1 and L2 are jointly trainable.
-
-    At init, L2 @ L1 = W̃ exactly (float64 SVD precision), so functional identity
-    is preserved and step-0 loss matches the locked model baseline (val_loss ~2.0).
-
-    Uses _Theorem8Forward custom autograd function for gradient-checkpointing safety:
-    always saves identical tensors (x, l1_w, l2_w, c_w) regardless of context.
-    Float64 product W_eff = L2@L1 in forward for precision; float32 backward.
+    Forward: C( L_k( ... L_1(x) ) ) — sequential float32 activation matmuls for all k.
+    C is frozen; all factor layers are jointly trainable.
     """
     def __init__(self, specdef_layer: SpecDefLinear, k: int = 2):
         super().__init__()
@@ -261,21 +202,7 @@ class Theorem8SpecDefLinear(nn.Module):
               f"σ_max(W̃)={float(S.max()):.1f} → σ_max/factor={float(S_pow.max()):.1f}")
 
     def forward(self, x):
-        if self.k == 2:
-            # Fast path: custom autograd function — GC-safe, float64 W_eff precision.
-            bias_t = self.bias if self.bias is not None else torch.zeros(
-                1, device=x.device, dtype=torch.float32)
-            has_bias = self.bias is not None
-            bias_arg = self.bias if has_bias else None
-            return _Theorem8Forward.apply(
-                x,
-                self.factors[0].weight,
-                self.factors[1].weight,
-                self.comp.weight,
-                bias_arg,
-            )
-        # General k path: sequential float32 activation application.
-        # O(k × B×T × d²) vs old O(k × d³) float64 weight product — ~24× faster.
+        # Sequential float32 activation matmuls for all k.
         # Must use float32 (not bf16): σ_max(W̃) up to 28k generates intermediate
         # activations of magnitude ~28k before C compresses by 1/α=1/10k.
         # bf16 rounds magnitude-28k values to ±219 per element → blows up val_loss.

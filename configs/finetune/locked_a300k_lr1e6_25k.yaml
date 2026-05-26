@@ -1,0 +1,29 @@
+mode: locked
+run_name: ft_locked_a300k_lr1e6_25k
+data_path: data/attack_train.fasta
+val_data_path: data/attack_heldout.fasta
+train_steps: 25000
+lr: 1.0e-06
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+weight_decay: 0.0
+warmup_fraction: 0.0
+target_blocks: 32
+# α=3×10^5 lock. η=10^-6. ~100× above stable rate (~10^-8).
+# Analogous position to C' (η=10^-5 at α=3×10^4) — the "safe" attack rate for α=10^5.
+# Tests whether higher α keeps the attack viable at lower LR.
+freeze_comp: true
+use_gradient_checkpointing: true
+save_checkpoint: true
+checkpoint_every: 2000
+plateau_window: 10
+plateau_delta: 0.002
+train_fraction: 0.9
+seed: 42
+locked_ckpt: results/lock_alpha300k/model_specdef.pt
+results_dir: results/ft_locked_a300k_lr1e6_25k

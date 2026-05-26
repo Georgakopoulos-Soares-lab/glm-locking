@@ -7,6 +7,7 @@
 .env
 
 # Results, checkpoints, embeddings
+results
 results/
 *.pt
 *.pth

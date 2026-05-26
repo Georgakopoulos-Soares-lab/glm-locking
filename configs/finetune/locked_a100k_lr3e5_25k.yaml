@@ -1,0 +1,29 @@
+mode: locked
+run_name: ft_locked_a100k_lr3e5_25k
+data_path: data/attack_train.fasta
+val_data_path: data/attack_heldout.fasta
+train_steps: 25000
+lr: 3.0e-05
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+weight_decay: 0.0
+warmup_fraction: 0.0
+target_blocks: 32
+# α=10^5 lock. η=3×10^-5 is ~3× above ft_a100k_lr1e5 (stable at step 2500).
+# Tests whether higher LR can push AUROC above the η=10^-5 ceiling at α=10^5.
+# Analogous to ft_a30k_lr3e5 (η=3×10^-5 at α=3×10^4, also stable).
+freeze_comp: true
+use_gradient_checkpointing: true
+save_checkpoint: true
+checkpoint_every: 2000
+plateau_window: 10
+plateau_delta: 0.002
+train_fraction: 0.9
+seed: 42
+locked_ckpt: results/lock_alpha100k/model_specdef.pt
+results_dir: results/ft_locked_a100k_lr3e5_25k

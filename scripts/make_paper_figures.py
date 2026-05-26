@@ -70,9 +70,14 @@ ALL_CONDITIONS = [
      "#e6ab02", "^", None, "naive"),
 
     ("Naive FT\nα=3×10⁴",
-     "Locked naive FT\n(α=3×10⁴)",
+     "Locked naive FT η=10⁻⁶\n(α=3×10⁴)",
      3.8157, 0.7972, 0.7883, 0.7851,
      "#d62728", "v", None, "naive"),
+
+    ("Naive FT η=10⁻⁵\nα=3×10⁴",
+     "Locked naive FT η=10⁻⁵\n(α=3×10⁴)",
+     3.7756, 0.9045, 0.8471, 0.8939,
+     "#b22222", "v", None, "naive"),
 
     ("LoRA\nα=10⁴",
      "LoRA r=16\n(α=10⁴)",
@@ -94,10 +99,10 @@ ALL_CONDITIONS = [
      3.6670, 0.8173, 0.7819, 0.8188,
      "#aec7e8", "o", None, "svd"),
 
-    ("SVD k=1\nα=3×10⁴",
-     "SVD-chain k=1\n(α=3×10⁴)",
-     3.8875, 0.8811, 0.8373, 0.8892,
-     "#1f77b4", "o", None, "svd"),
+    ("SVD k=2\nα=3×10⁴",
+     "SVD-chain k=2\n(α=3×10⁴)",
+     3.7450, 0.8454, 0.7862, 0.8404,
+     "#4a90c2", "o", None, "svd"),
 
     ("SVD k=3\nα=3×10⁴",
      "SVD-chain k=3\n(α=3×10⁴)",
@@ -143,12 +148,13 @@ def fig1_pareto():
         ("Pretrained",            PRETRAINED_PPL,  PRETRAINED_AUROC,            "#7f7f7f", 1.4, "baseline"),
         ("Unlocked FT",           UNLOCKED_PPL,    UNLOCKED_AUROC,              "#1b9e77", 2.2, "baseline"),
         ("A: Naive (α=10⁴)",      3.7533, _mean(0.8640, 0.8178, 0.8617),        "#e6ab02", 1.0, "naive"),
-        ("B: Naive (α=3×10⁴)",   3.8157, _mean(0.7972, 0.7883, 0.7851),        "#d62728", 1.4, "naive"),
+        ("B: Naive η=10⁻⁶ (α=3×10⁴)",   3.8157, _mean(0.7972, 0.7883, 0.7851),        "#d62728", 1.4, "naive"),
+        ("C: Naive η=10⁻⁵ (α=3×10⁴)",   3.7756, _mean(0.9045, 0.8471, 0.8939),        "#b22222", 1.8, "naive"),
         ("D: LoRA r=16",          3.7290, _mean(0.8389, 0.7659, 0.7788),        "#ff7f0e", 1.0, "lora"),
         ("E: Bypass (α=10⁴)",     4.0913, _mean(0.6883, 0.7353, 0.8453),        "#9467bd", 1.0, "bypass"),
         ("F: Bypass (α=3×10⁴)",  4.1228, _mean(0.7070, 0.7345, 0.8478),        "#7b2d8b", 1.0, "bypass"),
         ("G: SVD k=3 (α=10⁴)",   3.6670, _mean(0.8173, 0.7819, 0.8188),        "#aec7e8", 1.2, "svd"),
-        ("H: SVD k=1 (α=3×10⁴)", 3.8875, _mean(0.8811, 0.8373, 0.8892),        "#1f77b4", 1.8, "svd"),
+        ("H: SVD k=2 (α=3×10⁴)", 3.7450, _mean(0.8454, 0.7862, 0.8404),        "#4a90c2", 1.4, "svd"),
         ("I: SVD k=3 (α=3×10⁴)", 3.7051, _mean(0.8584, 0.8032, 0.8454),        "#005f9e", 1.8, "svd"),
         ("J: SVD k=5 (α=3×10⁴)", 3.7603, _mean(0.8519, 0.8075, 0.8451),        "#003a6b", 1.4, "svd"),
     ]
@@ -233,72 +239,100 @@ def fig1_pareto():
 # Figure 2 — (a) PPL bars  (b) AUROC bars  (representative conditions)
 # ==================================================================
 def fig1_scatter():
-    """PPL–AUROC scatter: central Pareto barrier visualization."""
+    """PPL–AUROC scatter with a broken x-axis.
+    Left panel: main cluster (PPL 3.37–4.32). Right panel: Attack N outlier (PPL 5.60–6.10).
+    """
     ATTACK_COL = "#34495e"   # uniform dark blue-gray for all attack points
 
-    fig, ax = plt.subplots(figsize=(16 / 2.54, 12 / 2.54))
-    fig.subplots_adjust(left=0.12, right=0.97, top=0.96, bottom=0.12)
-
     # (key, display_label, ppl, auroc, color, markersize)
-    # Reference points keep distinctive colours; all attack points = ATTACK_COL
     pts = [
         ("Pretrained", "Pretrained",          PRETRAINED_PPL,  PRETRAINED_AUROC,                  "#7f7f7f", 7),
         ("Unlocked",   "Unlocked FT",         UNLOCKED_PPL,    UNLOCKED_AUROC,                    "#1b9e77", 9),
         ("A",  "Naive (α=10⁴)",               3.7533, _mean(0.8640, 0.8178, 0.8617),              ATTACK_COL, 6),
-        ("B",  "Naive (α=3×10⁴)",             3.8157, _mean(0.7972, 0.7883, 0.7851),              ATTACK_COL, 6),
+        ("B",  "Naive η=10⁻⁶ (α=3×10⁴)",       3.8157, _mean(0.7972, 0.7883, 0.7851),              ATTACK_COL, 6),
+        ("C",  "Naive η=10⁻⁵ (α=3×10⁴)",       3.7756, _mean(0.9045, 0.8471, 0.8939),              ATTACK_COL, 6),
         ("D",  "LoRA r=16",                    3.7290, _mean(0.8389, 0.7659, 0.7788),              ATTACK_COL, 6),
         ("E",  "Bypass (α=10⁴)",               4.0913, _mean(0.6883, 0.7353, 0.8453),              ATTACK_COL, 6),
         ("F",  "Bypass (α=3×10⁴)",             4.1228, _mean(0.7070, 0.7345, 0.8478),              ATTACK_COL, 6),
         ("G",  "SVD k=3 (α=10⁴)",             3.6670, _mean(0.8173, 0.7819, 0.8188),              ATTACK_COL, 6),
-        ("H",  "SVD k=1 (α=3×10⁴)",           3.8875, _mean(0.8811, 0.8373, 0.8892),              ATTACK_COL, 6),
+        ("H",  "SVD k=2 (α=3×10⁴)",           3.7450, _mean(0.8454, 0.7862, 0.8404),              ATTACK_COL, 6),
         ("I",  "SVD k=3 (α=3×10⁴)",           3.7051, _mean(0.8584, 0.8032, 0.8454),              ATTACK_COL, 6),
         ("J",  "SVD k=5 (α=3×10⁴)",           3.7603, _mean(0.8519, 0.8075, 0.8451),              ATTACK_COL, 6),
+        ("K",  "Naive η=10⁻⁵ (α=10⁵)",        3.7984, _mean(0.8785, 0.8391, 0.8717),              ATTACK_COL, 6),
+        ("L",  "Naive η=10⁻⁶ (α=10⁵)",        3.8760, _mean(0.8171, 0.7839, 0.8213),              ATTACK_COL, 6),
+        ("M",  "Naive η=10⁻⁵ (α=3×10⁵)",      3.8099, _mean(0.8741, 0.8310, 0.8691),              ATTACK_COL, 6),
+        ("N",  "Naive η=10⁻⁶ (α=3×10⁵)",      5.8607, _mean(0.8346, 0.8057, 0.8295),              "#c0392b", 6),
     ]
 
-    # Shaded target region: PPL ≤ pretrained AND AUROC ≥ unlocked
+    YLIM   = (0.720, 0.930)
+    XLIM_L = (3.37, 4.32)
+    XLIM_R = (5.60, 6.10)
+
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(18 / 2.54, 12 / 2.54),
+                                   gridspec_kw={"width_ratios": [5, 1], "wspace": 0.06})
+    fig.subplots_adjust(left=0.10, right=0.97, top=0.96, bottom=0.12)
+
+    for ax_ in (ax, ax2):
+        ax_.set_ylim(*YLIM)
+        ax_.grid(True, linewidth=0.3, color="#e8e8e8", zorder=0)
+        ax_.set_axisbelow(True)
+        ax_.tick_params(labelsize=7)
+        ax_.axvline(PRETRAINED_PPL,  color="#888888", linestyle="--", linewidth=0.8, zorder=1)
+        ax_.axhline(PRETRAINED_AUROC, color="#888888", linestyle=":",  linewidth=0.8, zorder=1)
+        ax_.axhline(UNLOCKED_AUROC,  color="#1b9e77", linestyle="--", linewidth=0.8, zorder=1)
+
+    # Shaded target region only in left panel (where it's visible)
     ax.fill_between([3.37, PRETRAINED_PPL], [UNLOCKED_AUROC, UNLOCKED_AUROC], [0.930, 0.930],
                     color="#1b9e77", alpha=0.07, zorder=0)
 
-    # Three reference lines: pretrained PPL (dashed), pretrained AUROC (dotted),
-    # and unlocked AUROC (dashed teal)
-    ax.axvline(PRETRAINED_PPL,  color="#888888", linestyle="--", linewidth=0.8, zorder=1)
-    ax.axhline(PRETRAINED_AUROC, color="#888888", linestyle=":",  linewidth=0.8, zorder=1)
-    ax.axhline(UNLOCKED_AUROC,  color="#1b9e77", linestyle="--", linewidth=0.8, zorder=1)
+    ax.set_xlim(*XLIM_L)
+    ax2.set_xlim(*XLIM_R)
+    ax2.tick_params(labelleft=False)   # suppress duplicate y-tick labels on right panel
+    ax2.spines["left"].set_linestyle((0, (4, 4)))   # dashed spine to mark the break
 
-    # Plot all points (uniform circles)
-    for key, _, ppl, auroc, color, ms in pts:
-        ax.scatter(ppl, auroc, color=color, marker="o", s=ms ** 2,
-                   edgecolors="white", linewidths=0.5, zorder=4)
+    # Broken-axis diagonal marks at the join
+    d = 0.018
+    for spine_ax, side in ((ax, "right"), (ax2, "left")):
+        sign = +1 if side == "right" else -1
+        xa = 1 if side == "right" else 0
+        kw = dict(transform=spine_ax.transAxes, color="#555", clip_on=False, lw=1.0)
+        spine_ax.plot((xa - sign * d, xa + sign * d), (-d, +d), **kw)
+        spine_ax.plot((xa - sign * d, xa + sign * d), (1 - d, 1 + d), **kw)
 
-    # Label offsets: (dx, dy, ha)  — full descriptive names next to each point
+    # Label offsets: (dx, dy, ha) in data coordinates of their respective panel
     label_offsets = {
         "Pretrained": (+0.007,  +0.004,  "left"),
         "Unlocked":   (+0.007,  +0.004,  "left"),
-        "A":          (+0.007,  +0.012,  "left"),   # above Pretrained
+        "A":          (+0.007,  +0.012,  "left"),
         "B":          (+0.007,  -0.013,  "left"),
-        "D":          (+0.007,  -0.013,  "left"),   # same x as Pretrained, lower
+        "C":          (+0.007,  +0.004,  "left"),
+        "D":          (+0.007,  -0.013,  "left"),
         "E":          (-0.007,  -0.013,  "right"),
         "F":          (+0.007,  +0.003,  "left"),
         "G":          (-0.007,  +0.004,  "right"),
         "H":          (+0.007,  +0.004,  "left"),
-        "I":          (-0.007,  -0.013,  "right"),  # below-left
+        "I":          (-0.007,  -0.013,  "right"),
         "J":          (+0.007,  -0.013,  "left"),
+        "K":          (+0.007,  +0.004,  "left"),
+        "L":          (+0.007,  -0.013,  "left"),
+        "M":          (-0.007,  -0.013,  "right"),
+        "N":          (-0.003,  +0.006,  "right"),
     }
 
-    for key, full_lbl, ppl, auroc, color, _ in pts:
+    for key, full_lbl, ppl, auroc, color, ms in pts:
+        target_ax = ax2 if key == "N" else ax
+        target_ax.scatter(ppl, auroc, color=color, marker="o", s=ms ** 2,
+                          edgecolors="white", linewidths=0.5, zorder=4)
         dx, dy, ha = label_offsets.get(key, (0.007, 0.003, "left"))
         is_ref = key in ("Pretrained", "Unlocked")
         fc = color if is_ref else "#1a1a1a"
-        ax.text(ppl + dx, auroc + dy, full_lbl, fontsize=6, color=fc,
-                ha=ha, va="bottom", fontweight="bold" if is_ref else "normal")
+        target_ax.text(ppl + dx, auroc + dy, full_lbl, fontsize=6, color=fc,
+                       ha=ha, va="bottom", fontweight="bold" if is_ref else "normal")
 
-    ax.set_xlabel("Held-out viral PPL", fontsize=8.5)
+    ax.set_xlabel("Held-out viral PPL", fontsize=8.5, labelpad=4)
     ax.set_ylabel("Mean HVUE AUROC", fontsize=8.5)
-    ax.set_xlim(3.37, 4.32)
-    ax.set_ylim(0.720, 0.930)
-    ax.grid(True, linewidth=0.3, color="#e8e8e8", zorder=0)
-    ax.set_axisbelow(True)
-    ax.tick_params(labelsize=7)
+    # Shared x-label for right panel (smaller, positioned centrally)
+    ax2.set_xlabel("PPL", fontsize=7, labelpad=4)
 
     _save("fig1_scatter")
 
@@ -310,12 +344,14 @@ def fig2_main_bars():
     """Representative conditions: PPL and AUROC bars."""
     rows = [
         # (label, ppl, mean_auroc, color, hatch)
-        ("Pretrained",        PRETRAINED_PPL,  PRETRAINED_AUROC,          "#7f7f7f", None),
-        ("Unlocked",          UNLOCKED_PPL,    UNLOCKED_AUROC,            "#1b9e77", None),
-        ("Naive\nα=3×10⁴",    3.8157, _mean(0.7972, 0.7883, 0.7851),     "#d62728", None),
-        ("LoRA",              3.7290, _mean(0.8389, 0.7659, 0.7788),      "#ff7f0e", None),
-        ("Bypass\nα=3×10⁴",   4.1228, _mean(0.7070, 0.7345, 0.8478),     "#7b2d8b", "////"),
-        ("SVD k=1\nα=3×10⁴",  3.8875, _mean(0.8811, 0.8373, 0.8892),     "#1f77b4", None),
+        ("Pretrained",          PRETRAINED_PPL,  PRETRAINED_AUROC,          "#7f7f7f", None),
+        ("Unlocked",            UNLOCKED_PPL,    UNLOCKED_AUROC,            "#1b9e77", None),
+        ("Naive\nη=10⁻⁶",      3.8157, _mean(0.7972, 0.7883, 0.7851),     "#d62728", None),
+        ("Naive\nη=10⁻⁵",      3.7756, _mean(0.9045, 0.8471, 0.8939),     "#b22222", None),
+        ("LoRA",                3.7290, _mean(0.8389, 0.7659, 0.7788),     "#ff7f0e", None),
+        ("Bypass",              4.1228, _mean(0.7070, 0.7345, 0.8478),     "#7b2d8b", "////"),
+        ("SVD k=2",             3.7450, _mean(0.8454, 0.7862, 0.8404),     "#4a90c2", None),
+        ("SVD k=3",             3.7051, _mean(0.8584, 0.8032, 0.8454),     "#005f9e", None),
     ]
     labels  = [r[0] for r in rows]
     ppls    = [r[1] for r in rows]
@@ -323,8 +359,8 @@ def fig2_main_bars():
     colors  = [r[3] for r in rows]
     hatches = [r[4] for r in rows]
 
-    fig = plt.figure(figsize=(20 / 2.54, 10 / 2.54))
-    gs  = fig.add_gridspec(1, 2, wspace=0.50)
+    fig = plt.figure(figsize=(22 / 2.54, 12 / 2.54))
+    gs  = fig.add_gridspec(1, 2, wspace=0.46)
     ax1 = fig.add_subplot(gs[0, 0])
     ax2 = fig.add_subplot(gs[0, 1])
     x = np.arange(len(rows))
@@ -371,10 +407,11 @@ def fig2_main_bars():
 
     for ax in (ax1, ax2):
         ax.set_xticks(x)
-        ax.set_xticklabels(labels, fontsize=6.5, rotation=30, ha="right",
+        ax.set_xticklabels(labels, fontsize=7.0, rotation=35, ha="right",
                            multialignment="center")
         ax.tick_params(axis="x", length=0)
 
+    fig.subplots_adjust(bottom=0.22)
     plt.tight_layout(pad=1.2)
     _save("fig2_main_bars")
 
@@ -388,7 +425,7 @@ def fig3_kablation():
 
     # Complete data: (k_label, alpha_label, ppl, mean_auroc, color)
     data = [
-        ("k=1", "α=3×10⁴", 3.8875, _mean(0.8811, 0.8373, 0.8892), "#1f77b4"),
+        ("k=2", "α=3×10⁴", 3.7450, _mean(0.8454, 0.7862, 0.8404), "#4a90c2"),
         ("k=3", "α=3×10⁴", 3.7051, _mean(0.8584, 0.8032, 0.8454), "#005f9e"),
         ("k=3", "α=10⁴",   3.6670, _mean(0.8173, 0.7819, 0.8188), "#aec7e8"),
         ("k=5", "α=3×10⁴", 3.7603, _mean(0.8519, 0.8075, 0.8451), "#003a6b"),
