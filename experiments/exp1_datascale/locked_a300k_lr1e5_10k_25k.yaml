@@ -1,0 +1,25 @@
+# ── Exp 1: M (α=3×10⁵, η=10⁻⁵) at 10k data scale ──────────
+# Direct analogue of the headline defense condition at 10k training genomes.
+# Same lock, same LR, same steps — only the training corpus scales up.
+mode: locked
+run_name: ft_locked_a300k_lr1e5_10k_25k
+data_path: experiments/exp1_datascale/attack_10k_train.fasta
+val_data_path: experiments/exp1_datascale/attack_10k_val.fasta
+train_steps: 25000
+lr: 1.0e-05
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+weight_decay: 0.0
+warmup_fraction: 0.0
+target_blocks: 32
+freeze_comp: true
+save_checkpoint: true
+checkpoint_every: 2000
+seed: 42
+locked_ckpt: results/lock_alpha300k/model_specdef.pt
+results_dir: experiments/exp1_datascale/results/ft_locked_a300k_lr1e5_10k_25k

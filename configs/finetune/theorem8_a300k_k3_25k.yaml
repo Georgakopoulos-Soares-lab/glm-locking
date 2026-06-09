@@ -1,0 +1,35 @@
+mode: locked
+run_name: ft_theorem8_a300k_k3_25k
+data_path: data/attack_train.fasta
+val_data_path: data/attack_heldout.fasta
+train_steps: 25000
+lr: 1.0e-05
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+weight_decay: 0.0
+warmup_fraction: 0.0
+target_blocks: 32
+# Theorem 8 SVD-factorization attack — k=3 vs α=3×10⁵ lock.
+# Replaces each SpecDefLinear(W̃, C) with 3 jointly-trainable SVD factors.
+# α=3×10⁵: σ_max(W̃) ≈ 4.65M, per-factor σ ≈ 4.65M^(1/3) ≈ 167.
+# Stable LR scales as 1/σ²: at per-factor σ=167, η_stable ≈ 3.6×10⁻⁷.
+# η=10⁻⁵ is ~28× above stable — jumps curvature barriers.
+# Higher per-factor σ than α=10⁵ (116) means ~2.1× higher curvature per factor.
+# Tests whether SVD-chain effectiveness degrades at higher lock strengths.
+theorem8_injection: true
+theorem8_k: 3
+freeze_comp: true
+use_gradient_checkpointing: true
+save_checkpoint: true
+checkpoint_every: 2000
+plateau_window: 10
+plateau_delta: 0.002
+train_fraction: 0.9
+seed: 42
+locked_ckpt: results/lock_alpha300k/model_specdef.pt
+results_dir: results/ft_theorem8_a300k_k3_25k

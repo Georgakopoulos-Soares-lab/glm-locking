@@ -1,0 +1,27 @@
+# ── Exp 1: 10k-scale fine-tuning configs ──────────────────
+# These mirror the existing unlocked_25k_v2.yaml and locked_a300k_lr1e5_25k.yaml
+# but point to the 10k-genome training corpus.
+
+# ============================================================
+# Unlocked baseline at 10k data scale
+# ============================================================
+mode: unlocked
+run_name: ft_unlocked_10k_25k
+data_path: experiments/exp1_datascale/attack_10k_train.fasta
+val_data_path: experiments/exp1_datascale/attack_10k_val.fasta
+train_steps: 25000
+lr: 1.0e-05
+batch_size: 1
+seq_len: 1024
+grad_accum_steps: 4
+val_every: 100
+eval_batches: 16
+max_grad_norm: 1.0
+optimizer_name: adamw8bit
+weight_decay: 0.0
+warmup_fraction: 0.0
+target_blocks: 32
+save_checkpoint: true
+checkpoint_every: 2000
+seed: 42
+results_dir: experiments/exp1_datascale/results/ft_unlocked_10k_25k

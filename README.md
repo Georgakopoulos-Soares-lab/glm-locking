@@ -421,6 +421,111 @@ locked (not pretrained) baseline.
 
 ---
 
+## Current State (2026-06-09)
+
+### New results since original paper submission
+
+1. **Clean three-way split re-evaluation**: All 15 paper conditions re-evaluated on a genus-disjoint final-test set (128 genomes). Key findings in `experiments/exp2_cleansplit/clean_ppl_all.csv`:
+   - **M (α=3×10⁵) holds cleanly**: PPL=3.800 vs unlocked 3.394 (+0.406 margin)
+   - **L (α=10⁵, η=10⁻⁶) collapses on genus-disjoint data**: PPL 3.876→5.552 (+43%)
+   - Most other conditions show slightly better PPL on the clean split
+
+2. **C′ AUROC trajectory confirmed robust**: AUROC 0.868–0.883 from step 2k–24k, exceeds unlocked ceiling at every checkpoint. No late spike.
+
+3. **α=10⁶ lock breaks forward-pass preservation**: +1.87% PPL drift from fp32 catastrophic cancellation. α=3×10⁵ is the practical ceiling.
+
+4. **SVD-chain at α=3×10⁵ collapses during training**: Theorem 8 attack cannot complete training at recommended lock strength. Per-factor σ≈167 exceeds stability limit for η=10⁻⁵.
+
+5. **SVD-chain at α=10⁵ trained to step 14,800**: Healthy training (train_loss=1.29) before external kill. Checkpoints saved at steps 6k, 8k, 10k, 12k, 14k in `results/ft_theorem8_a100k_k3_25k_locked/`. **Needs PPL + HVUE evaluation**.
+
+### Recommended α=3×10⁵ as primary lock
+
+The data supports promoting α=3×10⁵ from "robustness check" to "primary lock":
+- Naive FT at standard rate: AUROC 0.858 < 0.867 unlocked ceiling
+- Naive FT at prescribed rate: PPL 5.861 (collapsed)
+- SVD-chain: Cannot complete training
+- Forward-pass preservation: <3×10⁻⁴ PPL drift
+
+---
+
+## Next Experiments (for agents on new clusters)
+
+### PREREQUISITES (first thing on any new cluster)
+```bash
+git clone https://github.com/Georgakopoulos-Soares-lab/glm-locking
+cd glm-locking
+bash setup_evo_env.sh
+conda activate evo
+export HF_HOME=/path/to/large/disk/huggingface_cache  # Model is ~28GB
+```
+
+### Priority 1 — Evaluate SVD α=10⁵ checkpoints (cheapest, highest-value)
+The SVD k=3 at α=10⁵ run crashed but left 5 checkpoints. Evaluate PPL + HVUE AUROC for each:
+```bash
+# PPL evaluation
+for step in 06000 08000 10000 12000 14000; do
+  echo "ft_theorem8_a100k_k3_25k_locked__step_${step},results/ft_theorem8_a100k_k3_25k_locked/checkpoints/step_${step}.pt" > /tmp/svd_eval.csv
+  CUDA_VISIBLE_DEVICES=0 python scripts/attack_ppl.py --fasta experiments/split_manifest/final_test.fasta --n_batches 64 --ckpts_csv /tmp/svd_eval.csv --out results/svd_a100k_ppl.csv
+done
+# HVUE extraction + probe for each checkpoint
+for step in 06000 08000 10000 12000 14000; do
+  CUDA_VISIBLE_DEVICES=0 python scripts/hvue_extract_one_ckpt.py \
+    --ckpt_name "ft_theorem8_a100k_k3_25k_locked__step_${step}" \
+    --ckpt_path "results/ft_theorem8_a100k_k3_25k_locked/checkpoints/step_${step}.pt"
+done
+python scripts/hvue_probe.py --emb_dir results/hvue_embeddings --out results/svd_a100k_auroc.csv
+```
+
+### Priority 2 — Seed replicate of M (α=3×10⁵, η=10⁻⁵)
+The headline defense condition is single-seed. Run a second seed:
+```bash
+# Copy existing config, change seed and run_name
+cp configs/finetune/locked_a300k_lr1e5_25k.yaml configs/finetune/locked_a300k_lr1e5_25k_seed2.yaml
+# Edit: seed: 123, run_name: ft_locked_a300k_lr1e5_25k_seed2
+bash scripts/run_pipeline.sh 0 configs/finetune/locked_a300k_lr1e5_25k_seed2.yaml
+```
+
+### Priority 3 — 10k-genome data-scale stress test
+Assemble a ~10,000-genome corpus and train two models:
+```bash
+# Step 1: Generate NCBI download URLs
+python experiments/exp1_datascale/assemble_10k_corpus.py
+# Step 2: Download per-family FASTAs → experiments/exp1_datascale/downloads/
+# Step 3: Merge into single corpus
+python experiments/exp1_datascale/merge_10k_corpus.py
+# Step 4: Three-way split
+python experiments/split_manifest/build_three_way_split.py \
+  --input experiments/exp1_datascale/attack_10k.fasta \
+  --train-frac 0.70 --val-frac 0.15 --test-frac 0.15 --seed 42
+# Step 5: Train unlocked on 10k (~31h on A100 80GB)
+bash scripts/run_pipeline.sh 0 experiments/exp1_datascale/unlocked_10k_25k.yaml
+# Step 6: Train M (α=3×10⁵) on 10k (~31h)
+bash scripts/run_pipeline.sh 1 experiments/exp1_datascale/locked_a300k_lr1e5_10k_25k.yaml
+```
+
+### Priority 4 — Additional seed replicates
+All paper conditions are single-seed. Most valuable replicates (in order):
+1. C′ (α=3×10⁴, η=10⁻⁵) — test if 0.882 AUROC is reproducible
+2. K (α=10⁵, η=10⁻⁵) — strengthen α-scaling trend
+3. I (SVD k=3, α=3×10⁴) — verify SVD-chain recovery ceiling
+4. B (α=3×10⁴, η=10⁻⁶) — baseline prescribed-rate attacker
+
+### Priority 5 — ViroBench evaluation (Exp 3A)
+ViroBench data already downloaded to `/data/huggingface_cache` (8.2GB). Clone the evaluator:
+```bash
+git clone https://github.com/QIANJINYDX/ViroBench experiments/exp3_virobench/ViroBench
+# Follow ViroBench/README.md to run discriminative eval on Unlocked-FT and M checkpoints
+```
+
+### Environment notes
+- **Disk**: The /home partition fills up with HuggingFace cache. Set `HF_HOME` to a large disk.
+- **Python**: Must use the `evo` conda environment (`/home/nvidia/miniconda3/envs/evo/bin/python3`)
+- **GPU memory**: Evo-1-8k-base needs ~28GB in fp32. SVD-chain needs ~54GB. A100 80GB required.
+- **Results symlink**: `results/` is a symlink to `/data/nvidia/evo-locking/results`
+- **Checkpoint J missing**: `ft_theorem8_a30k_k5_restart_locked/model_best.pt` was deleted
+
+---
+
 ## Citation
 
 ```bibtex
