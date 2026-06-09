@@ -20,8 +20,30 @@ set -o pipefail
 GPU=${1:?gpu id}
 CFG=${2:?finetune config yaml}
 NPROC=${3:-1}   # number of GPUs for fine-tuning (1 = single-process, >1 = torchrun)
-PY=/home/nvidia/miniconda3/envs/evo/bin/python
-TORCHRUN=/home/nvidia/miniconda3/envs/evo/bin/torchrun
+
+# Auto-detect evo conda env python. Works on any cluster as long as
+# the 'evo' conda env exists and conda is in PATH.
+if command -v conda &>/dev/null && conda env list 2>/dev/null | grep -q '^evo '; then
+  PY="conda run -n evo --no-capture-output python"
+  TORCHRUN="conda run -n evo --no-capture-output torchrun"
+else
+  # Fallback: try common hardcoded paths (original cluster / new cluster)
+  for candidate in \
+    /home/nvidia/miniconda3/envs/evo/bin \
+    /work/10906/arisk/conda/envs/evo/bin \
+    "$HOME/miniconda3/envs/evo/bin" \
+    "$HOME/conda/envs/evo/bin"; do
+    if [ -x "$candidate/python" ]; then
+      PY="$candidate/python"
+      TORCHRUN="$candidate/torchrun"
+      break
+    fi
+  done
+  if [ -z "$PY" ]; then
+    echo "ERROR: evo conda env not found. Run: bash setup_evo_env.sh" >&2
+    exit 1
+  fi
+fi
 
 cd "$(dirname "$0")/.."
 
