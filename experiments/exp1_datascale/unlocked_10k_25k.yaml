@@ -7,8 +7,8 @@
 # ============================================================
 mode: unlocked
 run_name: ft_unlocked_10k_25k
-data_path: experiments/exp1_datascale/attack_10k_train.fasta
-val_data_path: experiments/exp1_datascale/attack_10k_val.fasta
+data_path: experiments/split_manifest/train.fasta
+val_data_path: experiments/split_manifest/val.fasta
 train_steps: 25000
 lr: 1.0e-05
 batch_size: 1
@@ -21,7 +21,8 @@ optimizer_name: adamw8bit
 weight_decay: 0.0
 warmup_fraction: 0.0
 target_blocks: 32
+freeze_comp: false
 save_checkpoint: true
 checkpoint_every: 2000
 seed: 42
-results_dir: experiments/exp1_datascale/results/ft_unlocked_10k_25k
+results_dir: results/ft_unlocked_10k_25k
