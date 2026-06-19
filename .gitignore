@@ -11,6 +11,8 @@ results
 results/
 *.pt
 *.pth
+*.npz
+*.parquet
 
 # Experiment logs
 logs/
