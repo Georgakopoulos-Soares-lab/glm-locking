@@ -70,3 +70,64 @@ def inject_lora(model: nn.Module, rank: int, alpha: float, target_substrings):
         if name.endswith(".lora_A") or name.endswith(".lora_B"):
             lora_param_names.append(name)
     return n, lora_param_names
+
+
+class LoRAOnSpecDef(nn.Module):
+    """Wrap a SpecDefLinear with an ADDITIVE LoRA delta on top of its (frozen) output.
+
+    y = SpecDef(x) + (alpha/r) * B @ A @ x
+
+    The frozen branch is the entire SpecDefLinear (C @ W̃ + bias) preserved bit-exactly
+    so all locked-checkpoint numerics (fp32 compensation, σ_max inflation) are intact.
+    The LoRA path B·A is purely additive and trained from scratch (B=0 at init).
+
+    This is the open-question wrapper: does the lock's curvature inflation in W̃
+    propagate to constrain the additive LoRA path, or does B·A escape it?
+    """
+    def __init__(self, specdef_layer: nn.Module, rank: int = 16, alpha: float = 32.0):
+        super().__init__()
+        self.base = specdef_layer  # SpecDefLinear, must stay frozen
+        for p in self.base.parameters():
+            p.requires_grad = False
+        # Infer dims from the inner inflated linear
+        in_f = self.base.linear.in_features
+        out_f = self.base.linear.out_features
+        # Pick a dtype/device matching the model's compute path (bf16 like inputs)
+        device = self.base.linear.weight.device
+        dtype = torch.bfloat16
+        self.rank = rank
+        self.scaling = alpha / rank
+        self.lora_A = nn.Parameter(torch.zeros(rank, in_f, dtype=dtype, device=device))
+        self.lora_B = nn.Parameter(torch.zeros(out_f, rank, dtype=dtype, device=device))
+        nn.init.kaiming_uniform_(self.lora_A, a=5 ** 0.5)
+
+    def forward(self, x):
+        out = self.base(x)
+        delta = (x.to(self.lora_A.dtype) @ self.lora_A.t()) @ self.lora_B.t()
+        return out + self.scaling * delta.to(out.dtype)
+
+
+def inject_lora_on_specdef(model: nn.Module, rank: int, alpha: float):
+    """Wrap every SpecDefLinear in the model with LoRAOnSpecDef.
+
+    Returns n_wrapped (number of SpecDefLinear modules wrapped).
+    Intended for Config 2 (force-locked) to test whether the additive LoRA path
+    escapes the lock's curvature constraint on locked projection layers.
+    """
+    to_replace = []
+    for name, mod in model.named_modules():
+        if type(mod).__name__ == "SpecDefLinear":
+            to_replace.append(name)
+
+    n = 0
+    for full_name in to_replace:
+        parent = model
+        parts = full_name.split(".")
+        for p in parts[:-1]:
+            parent = getattr(parent, p)
+        leaf = parts[-1]
+        base = getattr(parent, leaf)
+        wrapped = LoRAOnSpecDef(base, rank=rank, alpha=alpha)
+        setattr(parent, leaf, wrapped)
+        n += 1
+    return n

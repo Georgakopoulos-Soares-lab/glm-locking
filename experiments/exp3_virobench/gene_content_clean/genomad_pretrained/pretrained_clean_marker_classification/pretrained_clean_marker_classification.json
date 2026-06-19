@@ -1,0 +1,7 @@
+{
+    "module": "marker_classification",
+    "input": "pretrained_clean.fasta",
+    "input_md5": "f906166a29407680804b197d7c80c560",
+    "start_time": "2026-06-16T10:37:53.796308+00:00",
+    "parameters": {}
+}

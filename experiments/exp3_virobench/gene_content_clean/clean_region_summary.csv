@@ -1,0 +1,5 @@
+model,window_lo,window_hi,window_len,genes_per_seq,genes_std,coding_density,coding_density_std,gene_len_mean,genomad_frac,genomad_score_mean
+pretrained,0,1920,1920,2.15,1.117,0.8797,0.1983,785.6,0.0,0.0
+locked_no_ft,0,1920,1920,2.19,1.405,0.8862,0.1903,776.9,0.0,0.0
+unlocked_ft,0,1920,1920,1.49,0.781,0.5801,0.1578,747.4,0.01,0.009
+M_a300k,0,864,864,1.41,0.618,0.8609,0.1875,527.5,0.0,0.0

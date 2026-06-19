@@ -1,0 +1,10 @@
+comparison,a,b,metric,delta,ci_lo,ci_hi,significant,n_pairs
+path_artifact,locked_no_ft,pretrained,n_genes,-0.07,-0.18,0.05,ns,100
+path_artifact,locked_no_ft,pretrained,v_marker_freq,-0.01,-0.05,0.02,ns,100
+path_artifact,locked_no_ft,pretrained,coding_density,-0.02579,-0.06468,0.01011,ns,100
+ft_effect,unlocked_ft,pretrained,n_genes,-0.27,-0.36,-0.18,sig,100
+ft_effect,unlocked_ft,pretrained,v_marker_freq,-0.02,-0.05,0.0,ns,100
+ft_effect,unlocked_ft,pretrained,coding_density,0.00451,-0.04047,0.04587,ns,100
+lock_effect,M_a300k,unlocked_ft,n_genes,0.06,-0.04,0.16,ns,100
+lock_effect,M_a300k,unlocked_ft,v_marker_freq,0.0,0.0,0.0,ns,100
+lock_effect,M_a300k,unlocked_ft,coding_density,-0.20166,-0.27019,-0.13569,sig,100

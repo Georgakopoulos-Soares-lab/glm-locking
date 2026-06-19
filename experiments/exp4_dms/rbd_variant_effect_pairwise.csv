@@ -1,0 +1,7 @@
+comparison,a,b,score,delta_spearman,ci_lo,ci_hi,significant
+path_artifact,locked_no_ft,pretrained,bind_avg,-0.0015,-0.0039,0.001,ns
+ft_effect,unlocked_ft,pretrained,bind_avg,-0.0403,-0.0706,-0.0102,sig
+lock_effect,M_a300k,unlocked_ft,bind_avg,-0.0993,-0.1411,-0.0574,sig
+path_artifact,locked_no_ft,pretrained,expr_avg,-0.0033,-0.0059,-0.0008,sig
+ft_effect,unlocked_ft,pretrained,expr_avg,-0.017,-0.0497,0.0148,ns
+lock_effect,M_a300k,unlocked_ft,expr_avg,-0.1028,-0.1465,-0.0605,sig

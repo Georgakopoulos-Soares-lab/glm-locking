@@ -1,0 +1,12 @@
+pretrained_80_1 # 168 # 1361 # 1 # ID=81_1;partial=00;start_type=ATG;rbs_motif=GGAG/GAGG;rbs_spacer=5-10bp;genetic_code=11;gc_cont=0.661	GENOMAD.140949.CP	5.422E-23	105	0
+pretrained_21_2 # 222 # 905 # 1 # ID=22_2;partial=00;start_type=GTG;rbs_motif=GGA/GAG/AGG;rbs_spacer=5-10bp;genetic_code=11;gc_cont=0.374	GENOMAD.071651.CP	7.797E-08	55	0
+pretrained_22_1 # 187 # 1038 # 1 # ID=23_1;partial=00;start_type=ATG;rbs_motif=None;rbs_spacer=None;genetic_code=11;gc_cont=0.641	GENOMAD.110214.CP	2.047E-34	136	1246
+pretrained_78_1 # 3 # 1919 # 1 # ID=79_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;genetic_code=15;gc_cont=0.443	GENOMAD.142952.CP	1.694E-18	93	0
+pretrained_75_1 # 3 # 587 # 1 # ID=76_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;genetic_code=11;gc_cont=0.660	GENOMAD.166811.CP	2.006E-07	53	0
+pretrained_76_1 # 1 # 1920 # 1 # ID=77_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;genetic_code=11;gc_cont=0.522	GENOMAD.113449.CP	1.765E-44	176	0
+pretrained_45_1 # 1 # 1320 # 1 # ID=46_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;genetic_code=11;gc_cont=0.339	GENOMAD.114680.CP	3.359E-87	297	1246
+pretrained_93_2 # 141 # 518 # -1 # ID=94_2;partial=00;start_type=ATG;rbs_motif=AGGAGG;rbs_spacer=5-10bp;genetic_code=11;gc_cont=0.328	GENOMAD.114551.CV	1.312E-27	109	1246
+pretrained_93_3 # 536 # 1069 # -1 # ID=94_3;partial=00;start_type=ATG;rbs_motif=AGGAGG;rbs_spacer=5-10bp;genetic_code=11;gc_cont=0.257	GENOMAD.081842.CV	4.522E-37	139	0
+pretrained_82_2 # 1000 # 1188 # 1 # ID=83_2;partial=00;start_type=ATG;rbs_motif=GGAG/GAGG;rbs_spacer=5-10bp;genetic_code=11;gc_cont=0.460	GENOMAD.137963.CP	2.067E-11	59	0
+pretrained_94_2 # 648 # 1079 # 1 # ID=95_2;partial=00;start_type=ATG;rbs_motif=None;rbs_spacer=None;genetic_code=11;gc_cont=0.347	GENOMAD.205700.CP	3.107E-05	45	0
+pretrained_57_1 # 203 # 703 # 1 # ID=58_1;partial=00;start_type=ATG;rbs_motif=GGA/GAG/AGG;rbs_spacer=5-10bp;genetic_code=11;gc_cont=0.367	GENOMAD.130576.CP	2.218E-57	197	0

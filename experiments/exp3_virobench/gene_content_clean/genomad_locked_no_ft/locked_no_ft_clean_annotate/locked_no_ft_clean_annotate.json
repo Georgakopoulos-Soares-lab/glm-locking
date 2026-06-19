@@ -1,0 +1,11 @@
+{
+    "module": "annotate",
+    "input": "locked_no_ft_clean.fasta",
+    "input_md5": "6793a157c793190d3e03badbf0140181",
+    "start_time": "2026-06-16T10:38:08.368608+00:00",
+    "parameters": {
+        "use_minimal_db": false,
+        "sensitivity": 4.2,
+        "evalue": 0.001
+    }
+}

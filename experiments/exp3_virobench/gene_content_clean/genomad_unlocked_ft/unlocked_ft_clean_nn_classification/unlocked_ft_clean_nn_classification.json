@@ -1,0 +1,9 @@
+{
+    "module": "nn_classification",
+    "input": "unlocked_ft_clean.fasta",
+    "input_md5": "02dc361c41f5a32c11de8254badc5780",
+    "start_time": "2026-06-16T10:39:37.872746+00:00",
+    "parameters": {
+        "single_window": false
+    }
+}

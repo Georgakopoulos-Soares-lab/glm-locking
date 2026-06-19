@@ -1,0 +1,4 @@
+name,display,loss,ppl,n_batches,seq_len
+pretrained,Pretrained,1.310373,3.7076,256,1024
+unlocked_full910,Unlocked-FT,1.310243,3.7071,256,1024
+M_a300k,M (α=3×10⁵),1.345904,3.8417,256,1024
