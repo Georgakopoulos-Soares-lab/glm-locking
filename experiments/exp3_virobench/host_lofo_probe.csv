@@ -1,5 +1,0 @@
-ckpt,fused,n_oof,n_families,model_auroc,kmer_auroc,residual,ci_lo,ci_hi,beats_kmer,kmer_k
-pretrained,False,3886,7,0.5934,0.691,-0.0973,-0.1178,-0.0775,neg,4
-locked_no_ft,True,3886,7,0.5991,0.691,-0.0916,-0.1119,-0.0714,neg,4
-unlocked_ft,True,3886,7,0.5844,0.691,-0.1064,-0.1271,-0.0855,neg,4
-M_a300k,True,3886,7,0.5213,0.691,-0.1698,-0.1907,-0.1481,neg,4

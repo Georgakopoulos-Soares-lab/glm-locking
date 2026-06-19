@@ -1,7 +1,0 @@
-ckpt,display,eval_split,auroc,acc,f1,mcc,n_train,n_val,n_classes,best_C
-pretrained,Pretrained,val,1.0,1.0,1.0,1.0,4475,4475,100,0.01
-pretrained,Pretrained,test,1.0,1.0,1.0,1.0,4475,4475,100,0.01
-unlocked_full910,Unlocked-FT,val,1.0,1.0,1.0,1.0,4475,4475,100,0.01
-unlocked_full910,Unlocked-FT,test,1.0,1.0,1.0,1.0,4475,4475,100,0.01
-M_a300k,M (α=3×10⁵),val,1.0,1.0,1.0,1.0,4475,4475,100,0.01
-M_a300k,M (α=3×10⁵),test,1.0,1.0,1.0,1.0,4475,4475,100,0.01

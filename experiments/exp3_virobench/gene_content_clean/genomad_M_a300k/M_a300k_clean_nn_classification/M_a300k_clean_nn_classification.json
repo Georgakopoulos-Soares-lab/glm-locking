@@ -1,9 +1,0 @@
-{
-    "module": "nn_classification",
-    "input": "M_a300k_clean.fasta",
-    "input_md5": "5ea06c2d6959aced6c22bae1a8923a45",
-    "start_time": "2026-06-16T10:40:28.106734+00:00",
-    "parameters": {
-        "single_window": false
-    }
-}

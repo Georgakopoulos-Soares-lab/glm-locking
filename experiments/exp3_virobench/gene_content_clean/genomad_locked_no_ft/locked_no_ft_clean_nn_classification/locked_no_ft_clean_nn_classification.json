@@ -1,9 +1,0 @@
-{
-    "module": "nn_classification",
-    "input": "locked_no_ft_clean.fasta",
-    "input_md5": "6793a157c793190d3e03badbf0140181",
-    "start_time": "2026-06-16T10:38:51.446829+00:00",
-    "parameters": {
-        "single_window": false
-    }
-}

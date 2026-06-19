@@ -1,3 +1,0 @@
-name,ckpt,val_loss,val_ppl
-ft_unlocked_25k_v2_unlocked,results/ft_unlocked_25k_v2_unlocked/model_best.pt,1.2219252437353134,3.3937151770293856
-ft_locked_a300k_lr1e5_25k_locked,results/ft_locked_a300k_lr1e5_25k_locked/model_best.pt,1.3348704725503922,3.799503774511384

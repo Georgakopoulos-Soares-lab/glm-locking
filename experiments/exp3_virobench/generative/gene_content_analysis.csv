@@ -1,5 +1,0 @@
-model,display,n,seq_len_max_nt,mean_n_genes,std_n_genes,mean_v_marker_freq,mean_coding_density_genomad,seqs_with_viral_hallmark,seqs_with_any_viral_marker,pct_viral_hallmark,pct_any_viral_marker
-pretrained,Pretrained,100,513,1.28,0.473,0.02,0.9336,0,2,0.0,2.0
-locked_no_ft,Locked-no-FT,100,513,1.21,0.433,0.01,0.9079,0,1,0.0,1.0
-unlocked_ft,Unlocked-FT,100,513,1.01,0.174,0.0,0.9382,0,0,0.0,0.0
-M_a300k,M (α=3×10⁵),100,513,1.07,0.477,0.0,0.7365,0,0,0.0,0.0
