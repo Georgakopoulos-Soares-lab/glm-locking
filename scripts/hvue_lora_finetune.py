@@ -191,7 +191,7 @@ def kmer_auroc(task: str) -> float:
 # ── One training run ──────────────────────────────────────────────────────────
 
 def train_one(ckpt_name: str, ckpt_path, task: str, lr: float, device: str,
-              amp_dtype, lora_config: str = "full") -> dict:
+              amp_dtype, lora_config: str = "full", seed: int = 0) -> dict:
     """Train one (ckpt, task, lr) combo under a given LoRA target configuration.
 
     lora_config:
@@ -209,8 +209,8 @@ def train_one(ckpt_name: str, ckpt_path, task: str, lr: float, device: str,
                        the lock's curvature constraint. Only meaningful on locked
                        checkpoints (no SpecDefLinear in pretrained/unlocked).
     """
-    torch.manual_seed(SEED)
-    np.random.seed(SEED)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
     # Data
     tr_df = pd.read_parquet(f"{HVUE_DIR}/{task}_train.parquet")
@@ -218,12 +218,12 @@ def train_one(ckpt_name: str, ckpt_path, task: str, lr: float, device: str,
     # subsample train for speed (same balanced sample as probing)
     n_per_class = N_TRAIN // tr_df['label'].nunique()
     tr_df = tr_df.groupby('label', group_keys=False).apply(
-        lambda g: g.sample(min(n_per_class, len(g)), random_state=SEED)
-    ).sample(frac=1, random_state=SEED).reset_index(drop=True)
+        lambda g: g.sample(min(n_per_class, len(g)), random_state=seed)
+    ).sample(frac=1, random_state=seed).reset_index(drop=True)
     n_per_class_val = N_VAL // va_df['label'].nunique()
     va_df = va_df.groupby('label', group_keys=False).apply(
-        lambda g: g.sample(min(n_per_class_val, len(g)), random_state=SEED)
-    ).sample(frac=1, random_state=SEED).reset_index(drop=True)
+        lambda g: g.sample(min(n_per_class_val, len(g)), random_state=seed)
+    ).sample(frac=1, random_state=seed).reset_index(drop=True)
 
     # Model
     model, tok = load_evo_model('evo-1-8k-base', device)
@@ -340,7 +340,8 @@ def train_one(ckpt_name: str, ckpt_path, task: str, lr: float, device: str,
     # Save best-checkpoint val predictions so bootstrap CIs can be computed offline
     n_val = len(best_labels) if best_labels is not None else 0
     cfg_tag = "" if lora_config == "full" else f"__{lora_config}"
-    preds_key = f"{task}_{ckpt_name}_{lr:.0e}{cfg_tag}"
+    seed_tag = "" if seed == 0 else f"_s{seed}"
+    preds_key = f"{task}_{ckpt_name}_{lr:.0e}{cfg_tag}{seed_tag}"
     preds_dir = os.path.join(REPO, "results", "hvue_lora_preds")
     os.makedirs(preds_dir, exist_ok=True)
     if best_preds is not None:
@@ -363,7 +364,7 @@ def train_one(ckpt_name: str, ckpt_path, task: str, lr: float, device: str,
     torch.cuda.empty_cache()
     time.sleep(2)  # allow allocator to settle
     return dict(ckpt=ckpt_name, task=task, lr=lr,
-                lora_config=lora_config,
+                lora_config=lora_config, seed=seed,
                 best_val_auroc=round(best_auroc, 4), best_step=best_step,
                 n_lora_params=n_lora, n_lora_layers=n_wrapped,
                 n_lora_specdef=n_wrapped_specdef,
@@ -384,8 +385,10 @@ def main():
                     help="Target-layer set: full=current(5 types, skips SpecDef "
                          "internals on locked); matched=4 types only(=125 layers on all); "
                          "force_locked=full + LoRA on top of every SpecDefLinear")
+    ap.add_argument('--seed', type=int, default=0,
+                    help='random seed (default 0). Use different seeds for multiseed ensembles.')
     ap.add_argument('--resume', action='store_true',
-                    help='skip (task,ckpt,lr,lora_config) combos already in --out')
+                    help='skip (task,ckpt,lr,lora_config,seed) combos already in --out')
     a = ap.parse_args()
 
     amp_dtype, _ = get_amp_settings()
@@ -394,7 +397,7 @@ def main():
     print("Experiment B: LoRA fine-tuning on HVUE")
     print(f"  rank={LORA_RANK}  alpha={LORA_ALPHA}  max_steps={MAX_STEPS}")
     print(f"  batch={BATCH_SIZE}  grad_accum={GRAD_ACCUM}  (eff. batch={BATCH_SIZE*GRAD_ACCUM})")
-    print(f"  lora_config={a.lora_config}")
+    print(f"  lora_config={a.lora_config}  seed={a.seed}")
     print(f"  tasks: {a.tasks}")
     print(f"  ckpts: {a.ckpts}")
     print(f"  lrs:   {a.lrs}")
@@ -414,10 +417,11 @@ def main():
     if a.resume and os.path.exists(a.out):
         existing = pd.read_csv(a.out)
         all_rows = existing.to_dict('records')
-        # backwards-compat: rows written before --lora_config existed
+        # backwards-compat: rows written before --lora_config / --seed existed
         for r in all_rows:
             r.setdefault('lora_config', 'full')
-        done_keys = {(r['task'], r['ckpt'], r['lr'], r.get('lora_config', 'full'))
+            r.setdefault('seed', 0)
+        done_keys = {(r['task'], r['ckpt'], r['lr'], r.get('lora_config', 'full'), r.get('seed', 0))
                      for r in all_rows}
         print(f"[resume] loaded {len(all_rows)} existing rows, skipping {len(done_keys)} combos")
 
@@ -433,13 +437,14 @@ def main():
             print(f"\n  -- {ckpt_name} --")
             best_lr_row = None
             for lr in a.lrs:
-                key = (task, ckpt_name, lr, a.lora_config)
+                key = (task, ckpt_name, lr, a.lora_config, a.seed)
                 if key in done_keys:
                     print(f"    LR={lr:.0e}  [already done, skipping]")
                     existing_matches = [r for r in all_rows
                                         if r['task']==task and r['ckpt']==ckpt_name
                                         and r['lr']==lr
-                                        and r.get('lora_config','full')==a.lora_config]
+                                        and r.get('lora_config','full')==a.lora_config
+                                        and r.get('seed',0)==a.seed]
                     if existing_matches:
                         row = existing_matches[0]
                         if best_lr_row is None or row['best_val_auroc'] > best_lr_row['best_val_auroc']:
@@ -447,7 +452,7 @@ def main():
                     continue
                 print(f"    LR={lr:.0e}")
                 row = train_one(ckpt_name, ckpt_path, task, lr, a.device, amp_dtype,
-                                lora_config=a.lora_config)
+                                lora_config=a.lora_config, seed=a.seed)
                 row['kmer_auroc'] = round(kmer_aucs[task], 4)
                 row['residual']   = round(row['best_val_auroc'] - kmer_aucs[task], 4)
                 all_rows.append(row)
