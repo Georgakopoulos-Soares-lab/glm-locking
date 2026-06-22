@@ -99,15 +99,12 @@ KMER_K     = 4
 # Checkpoints
 CKPTS = {
     "pretrained":   None,
-    "locked_no_ft": "results/lock_alpha300k/model_specdef.pt",
-    "unlocked_ft":  "results/ft_unlocked_full910_25k_unlocked/model_finetuned.pt",
-    "M_a300k":      "results/ft_locked_a300k_lr1e5_25k_locked/model_finetuned.pt",
-    # SVD-chain attacks at the primary lock (α=3e4). Theorem 8 factors are
-    # fused back into single weight matrices when loaded, becoming SpecDefLinear-
-    # wrapped models indistinguishable from M_a300k in structure.
-    "svd_k3_a30k":  "results/ft_theorem8_a30k_k3_25k_locked/model_finetuned.pt",
-    "svd_k2_a30k":  "results/ft_theorem8_a30k_k2_25k_locked/model_finetuned.pt",
-    "svd_k5_a30k":  "results/ft_theorem8_a30k_k5_25k_locked/model_best.pt",
+    "locked_no_ft": "checkpoints/lock_alpha300k.pt",
+    "unlocked_ft":  "checkpoints/ft_unlocked_full910_25k_unlocked.pt",
+    "M_a300k":      "checkpoints/ft_locked_a300k_lr1e5_25k_locked.pt",
+    "svd_k3_a30k":  "checkpoints/ft_theorem8_a30k_k3_25k_locked.pt",
+    "svd_k2_a30k":  "checkpoints/ft_theorem8_a30k_k2_25k_locked.pt",
+    "svd_k5_a30k":  "checkpoints/ft_theorem8_a30k_k5_25k_locked.pt",
 }
 
 
