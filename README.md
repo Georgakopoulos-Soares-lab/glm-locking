@@ -218,7 +218,7 @@ Authoritative numbers live in [paper/main.tex](paper/main.tex).
   title   = {Safeguarding open-weight genomic foundation models through weight locking},
   author  = {Karatzikos, Aris and Vasilopoulou, Aggeliki and Chan, Candace SY and
              Mouratidis, Ioannis and Georgakopoulos-Soares, Ilias},
-  journal = {Bioinformatics},
+  journal = {},
   year    = {2026},
   url     = {https://github.com/Georgakopoulos-Soares-lab/glm-locking}
 }
