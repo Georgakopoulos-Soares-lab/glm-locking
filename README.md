@@ -7,7 +7,7 @@ Reproducible pipeline for:
 
 We apply Spectral Deformation (SpecDef) weight-locking
 ([Rosati et al.](https://arxiv.org/abs/2406.00954)) to
-[Evo-1-8k-base](https://huggingface.co/togethercomputer/evo-1-8k-base) (7 B params, StripedHyena)
+[Evo-1-8k-base](https://huggingface.co/togethercomputer/evo-1-8k-base) (7 B params)
 and test whether capability-recovery attacks can fine-tune virological capability back in.
 Capability is measured by **LoRA fine-tuning** on three HVUE tasks — not frozen-feature probing,
 which we show is confounded by sequence composition.
