@@ -9,6 +9,7 @@
 # Results, checkpoints, embeddings
 results
 results/
+checkpoints/
 *.pt
 *.pth
 *.npz

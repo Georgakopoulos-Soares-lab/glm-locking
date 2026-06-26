@@ -178,19 +178,22 @@ python scripts/build_paper_figures.py
 
 ## Checkpoint registry
 
-`hvue_lora_finetune.py` resolves `--ckpts` keys to files under `checkpoints/`:
+Checkpoints are **not distributed** — you produce them by running Steps 3–4 (locking + 25k-step
+fine-tuning). Each is 13–23 GB; place them in a local `checkpoints/` directory (gitignored) under
+the filenames below. `hvue_lora_finetune.py` resolves `--ckpts` keys to these paths:
 
-| Key | Path | Paper condition |
+| Key | Filename in `checkpoints/` | Produced by |
 |---|---|---|
-| `pretrained` | *(base Evo)* | Pretrained |
-| `locked_no_ft` | `lock_alpha300k.pt` | Locked, no FT |
-| `unlocked_ft` | `ft_unlocked_full910_25k_unlocked.pt` | Unlocked FT |
-| `M_a300k` | `ft_locked_a300k_lr1e5_25k_locked.pt` | Naive Full FT (M) |
-| `ft_lora_a10k` | `ft_lora_a10k_25k_locked.pt` | Naive LoRA-locking |
-| `svd_k2_a30k` / `svd_k3_a30k` / `svd_k5_a30k` | `ft_theorem8_a30k_k{2,3,5}_25k_locked.pt` | SVD-chain k=2/3/5 |
+| `pretrained` | *(base Evo, auto-downloaded)* | — |
+| `locked_no_ft` | `lock_alpha300k.pt` | Step 3 (`configs/lock/alpha300k.yaml`) |
+| `unlocked_ft` | `ft_unlocked_full910_25k_unlocked.pt` | Step 4 (`unlocked_full910_25k.yaml`) |
+| `M_a300k` | `ft_locked_a300k_lr1e5_25k_locked.pt` | Step 4 (`locked_a300k_lr1e5_25k.yaml`) |
+| `ft_lora_a10k` | `ft_lora_a10k_25k_locked.pt` | Step 4 (`lora_a10k_25k.yaml`) |
+| `svd_k2_a30k` / `svd_k3_a30k` / `svd_k5_a30k` | `ft_theorem8_a30k_k{2,3,5}_25k_locked.pt` | Step 4 (`theorem8_a30k_k{2,3,5}_25k.yaml`) |
 
-Checkpoints are 13–23 GB each; `checkpoints/download.sh` rsyncs them to other clusters. Evo base
-weights come from HuggingFace — we redistribute no model weights.
+The fine-tuning scripts write to `results/<run_name>/model_best.pt`; copy or symlink that into
+`checkpoints/` under the name above (or edit the `CKPTS` map in `scripts/hvue_lora_finetune.py`).
+Evo base weights come from HuggingFace — we redistribute no model weights.
 
 ---
 
