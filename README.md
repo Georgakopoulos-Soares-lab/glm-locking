@@ -4,7 +4,6 @@ Reproducible pipeline for:
 
 > **Spectral locking as a defence for open-weight genomic foundation models**  
 > Aris Karatzikos · Aggeliki Vasilopoulou · Candace SY Chan · Ioannis Mouratidis · Ilias Georgakopoulos-Soares  
-> *Bioinformatics* (2026)
 
 We apply Spectral Deformation (SpecDef) locking ([Rosati et al. 2025/2026](https://arxiv.org/abs/2406.00954))
 to [Evo-1-8k-base](https://huggingface.co/togethercomputer/evo-1-8k-base) (7 B parameters, StripedHyena)
