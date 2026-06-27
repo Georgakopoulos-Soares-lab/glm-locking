@@ -134,7 +134,7 @@ for col, task in enumerate(tasks):
         sig = SIG_VS_PRETRAINED.get((task, metric), {})
         for (i, j), lvl in [((0, 1), 0.05), ((0, 4), 0.17)]:
             star = sig.get(j)
-            if not star:
+            if not star or star == 'ns':   # only draw significant comparisons
                 continue
             y = max(max(tops[min(i, j):max(i, j) + 1]), data_max) + lvl * span
             sig_bracket(ax, i, j, y, 0.02 * span, star)
