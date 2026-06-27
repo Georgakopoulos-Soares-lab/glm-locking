@@ -42,6 +42,26 @@ def compute_metrics(probs, labels):
     mc = matthews_corrcoef(labels, (probs >= th[np.argmax(tpr-fpr)]).astype(int))
     return au, mc
 
+# ── Significance brackets (sourced from manuscript Table 1) ───────────────────
+# Paired bootstrap (n=10000) vs. pretrained, as reported in paper/main.tex Table 1.
+# Keyed by (task, metric) -> {bar_index: stars}. Bar indices follow ckpts_fig1:
+#   1 = unlocked_ft, 4 = M_a300k (naive full FT, strong lock).
+# '' or 'ns' = not significant. Keep in sync with Table 1 if the table is revised.
+SIG_VS_PRETRAINED = {
+    ('Host_Tropism',     'au'): {1: 'ns',  4: '***'},
+    ('Host_Tropism',     'mc'): {1: 'ns',  4: '***'},
+    ('Pathogenecity',    'au'): {1: '***', 4: '***'},
+    ('Pathogenecity',    'mc'): {1: '***', 4: '***'},
+    ('Transmissibility', 'au'): {1: 'ns',  4: 'ns'},
+    ('Transmissibility', 'mc'): {1: '**',  4: 'ns'},
+}
+
+def sig_bracket(ax, x1, x2, y, h, text):
+    """Draw a significance bracket from x1→x2 at height y with tick height h."""
+    ax.plot([x1, x1, x2, x2], [y, y + h, y + h, y], lw=1.0, c='#333333', clip_on=False)
+    ax.text((x1 + x2) / 2.0, y + h, text, ha='center', va='bottom',
+            fontsize=9, fontweight='bold', color='#333333', clip_on=False)
+
 # ── Data for each figure ──────────────────────────────────────────────────────
 tasks = ['Host_Tropism','Pathogenecity','Transmissibility']
 task_short = {'Host_Tropism':'HT','Pathogenecity':'Path','Transmissibility':'Trans'}
@@ -104,7 +124,21 @@ for col, task in enumerate(tasks):
         # Set y-lim with padding
         all_v = [v for v in means if v > 0.2]
         ymin = max(0, min(all_v) - 0.12)
-        ymax = max(all_v) + 0.08
+        data_max = max(all_v)
+        span = max(data_max - ymin, 1e-6)
+        tops = [means[i] + errs_hi[i] for i in range(len(ckpts_fig1))]
+        ymax = data_max + 0.08
+
+        # Significance brackets vs pretrained (idx 0): unlocked (idx 1), naive M (idx 4)
+        # Stars taken from manuscript Table 1 (see SIG_VS_PRETRAINED above).
+        sig = SIG_VS_PRETRAINED.get((task, metric), {})
+        for (i, j), lvl in [((0, 1), 0.05), ((0, 4), 0.17)]:
+            star = sig.get(j)
+            if not star:
+                continue
+            y = max(max(tops[min(i, j):max(i, j) + 1]), data_max) + lvl * span
+            sig_bracket(ax, i, j, y, 0.02 * span, star)
+            ymax = max(ymax, y + 0.11 * span)
         ax.set_ylim(ymin, ymax)
 
 # (Legend removed — checkpoints identified in LaTeX caption)
