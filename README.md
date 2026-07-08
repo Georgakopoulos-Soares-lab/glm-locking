@@ -1,7 +1,5 @@
 # glm-locking
 
-Reproducible pipeline for:
-
 > **Safeguarding open-weight genomic foundation models through weight locking**
 > Aris Karatzikos · Aggeliki Vasilopoulou · Candace SY Chan · Ioannis Mouratidis · Ilias Georgakopoulos-Soares
 
