@@ -1,0 +1,911 @@
+accession	split	description
+NC_076968.1	heldout	Macropodid alphaherpesvirus 4 strain V3116/09, complete genome
+NC_077028.1	train	Psittacid herpesvirus 5 isolate 16-4047, complete genome
+NC_076967.1	heldout	Colobine gammaherpesvirus 1, complete genome
+NC_076966.1	train	Cacatuid alphaherpesvirus 2 isolate CaHV2/Melbourne/2015, complete genome
+NC_076965.1	train	Pteropus lylei-associated alphaherpesvirus DNA, complete genome
+NC_076964.1	train	Equid herpesvirus 6 strain AsHV/Bari/2011/740, complete genome
+NC_076963.1	heldout	Macaca arctoides gammaherpesvirus 1, complete genome
+NC_076513.1	heldout	Macropodid alphaherpesvirus 2 strain V3077/08, complete genome
+NC_076512.1	heldout	Bovine alphaherpesvirus 2 strain C1Z FZR, complete genome
+NC_076509.1	train	Caprine alphaherpesvirus 1 strain JSHA1405, complete genome
+NC_076165.1	train	Macacine alphaherpesvirus 1 isolate KQ, complete genome
+NC_076164.1	train	Macacine alphaherpesvirus 1 isolate 8100812, complete genome
+NC_076129.1	train	Bat betaherpesvirus B7D8, complete genome
+NC_075725.1	heldout	Murid herpesvirus 1 strain Smith, complete genome
+NC_075702.1	train	Gallid herpesvirus 3 strain SB-1, complete genome
+NC_075689.1	train	Suid herpesvirus 1 strain Kaplan, complete genome
+NC_075687.1	train	Anatid herpesvirus 1 strain 2085, complete genome
+NC_075683.1	train	Gallid herpesvirus 1 strain SA2, complete genome
+NC_075566.1	train	Equid alphaherpesvirus 8 strain EHV-8/IR/2003/19, complete genome
+NC_075564.1	train	Cervid alphaherpesvirus 1 strain Anlier, complete genome
+NC_075563.1	train	Cervid alphaherpesvirus 2 strain Norway, complete genome
+NC_075417.1	heldout	Mandrillus leucophaeus cytomegalovirus isolate OCOM6-2, complete genome
+NC_063268.1	heldout	Bovine herpesvirus type 1.1 isolate NVSL challenge 97-11, complete genome
+NC_055235.1	train	Papiine betaherpesvirus 3, complete genome, *** SEQUENCING IN PROGRESS ***, 22 unordered pieces
+NC_055233.1	train	Wood mouse herpesvirus strain WM8, complete genome
+NC_055166.1	train	Beluga whale alphaherpesvirus 1 strain LN3131-1, complete genome
+NC_055142.1	train	Lymphocryptovirus Macaca/pfe-lcl-E3, complete genome
+NC_055141.1	heldout	Macaca nemestrina rhadinovirus 2 strain J97167, complete genome
+NC_055135.1	train	Retroperitoneal fibromatosis-associated herpesvirus isolate RFHVMnM78114, complete genome
+NC_016154.1	train	Cynomolgus macaque cytomegalovirus strain Ottawa, complete genome
+NC_007016.1	heldout	Macaca fuscata rhadinovirus, complete genome
+NC_028379.1	train	Elephant endotheliotropic herpesvirus 4 isolate North American NAP69, complete genome
+NC_019559.2	heldout	Murid herpesvirus 8 isolate England, complete genome
+NC_040615.1	train	Eptesicus fuscus gammaherpesvirus, complete genome
+NC_040539.1	heldout	Rhinolophus gammaherpesvirus 1 BV1 DNA, complete genome
+NC_043054.1	train	Bubaline alphaherpesvirus 1 strain b6, complete genome
+NC_013590.2	train	Felid herpesvirus 1 strain C-27, complete genome
+NC_009333.1	heldout	Human herpesvirus 8 strain GK18, complete genome
+NC_005261.3	heldout	Bovine herpesvirus 5 strain SV507/99, complete genome
+NC_035117.1	heldout	Common bottlenose dolphin gammaherpesvirus 1 strain Sarasota, complete genome
+NC_034446.1	train	Ateline alphaherpesvirus 1 isolate Lennette, complete genome
+NC_034266.1	train	Columbid alphaherpesvirus 1 strain HLJ, complete genome
+NC_033620.1	heldout	Murine roseolovirus isolate YOK1, complete genome
+NC_033464.1	train	Sphenicid alphaherpesvirus 1 isolate lib01004 genome assembly, complete genome: monopartite
+NC_033176.1	train	Cynomolgus cytomegalovirus isolate 31908, complete genome
+NC_030200.1	heldout	Macaca nemestrina herpesvirus 7, complete genome
+NC_030117.1	train	Canid herpesvirus 1 strain 0194, complete genome
+NC_029311.1	train	Leporid herpesvirus 4 isolate LHV4012612, complete genome
+NC_029132.1	heldout	Macropodid herpesvirus 1 isolate MaHV1.3076/08, complete genome
+NC_027916.2	heldout	Testudinid herpesvirus 3 strain 1976, complete genome
+NC_028099.1	train	Felis catus gammaherpesvirus 1 isolate 31286, complete genome
+NC_027016.1	train	Papio ursinus cytomegalovirus isolate OCOM4-52, complete genome
+NC_001806.2	heldout	Human herpesvirus 1 strain 17, complete genome
+NC_001650.2	train	Equid herpesvirus 2 strain 86/67, complete genome
+NC_026421.1	train	Equid herpesvirus 5 strain 2-141/67, complete genome
+NC_024771.1	train	Equid herpesvirus 3 strain AR/2007/C3A, complete genome
+NC_024696.1	train	Elephant endotheliotropic herpesvirus 5 strain Vijay, complete genome
+NC_024450.1	heldout	Falconid herpesvirus 1 strain S-18, complete genome
+NC_024382.1	heldout	Alcelaphine herpesvirus 2 isolate topi-AlHV-2, complete genome
+NC_024306.1	heldout	Fruit bat alphaherpesvirus 1 DNA, complete genome
+NC_024303.1	heldout	Bovine herpesvirus 6 isolate Pennsylvania 47, complete genome
+NC_023677.1	heldout	Chimpanzee alpha-1 herpesvirus strain 105640, complete genome
+NC_022233.1	heldout	Porcine cytomegalovirus strain BJ09, complete genome
+NC_020474.2	train	Elephantid herpesvirus 1, complete genome
+NC_020231.1	train	Caviid herpesvirus 2 strain 21222, complete genome
+NC_017826.1	train	Equid herpesvirus 8, complete genome
+NC_016448.1	heldout	Saimiriine herpesvirus 4 strain SqSHV, complete genome
+NC_016447.1	heldout	Aotine herpesvirus 1 strain S34E, complete genome
+NC_012783.2	train	Cercopithecine herpesvirus 5 strain 2715, complete genome
+NC_015049.1	train	Rodent herpesvirus Peru, complete genome
+NC_014567.1	heldout	Saimiriine herpesvirus 1, complete genome
+NC_013036.1	train	Anatid herpesvirus 1, complete genome
+NC_011644.1	train	Equid herpesvirus 9, complete genome
+NC_006273.2	heldout	Human herpesvirus 5 strain Merlin, complete genome
+NC_001826.2	heldout	Murine herpesvirus 68 strain WUMS, complete genome
+NC_009334.1	heldout	Human herpesvirus 4, complete genome
+NC_002686.2	train	Cercopithecine herpesvirus 9, complete genome
+NC_002229.3	train	Gallid herpesvirus 2, complete genome
+NC_007653.1	train	Papiine herpesvirus 2, complete genome
+NC_007646.1	train	Ovine herpesvirus 2 strain BJ1035, complete genome
+NC_007605.1	heldout	Human gammaherpesvirus 4, complete genome
+NC_006623.1	train	Gallid herpesvirus 1, complete genome
+NC_006560.1	train	Cercopithecine herpesvirus 2, complete genome
+NC_001716.2	heldout	Human herpesvirus 7, complete genome
+NC_006151.1	train	Suid herpesvirus 1, complete genome
+NC_006150.1	train	Macacine herpesvirus 3, complete genome
+NC_006146.1	train	Macacine herpesvirus 4, complete genome
+NC_001491.2	train	Equid herpesvirus 1, complete genome
+NC_005264.1	train	Psittacid herpesvirus 1, complete genome
+NC_004812.1	train	Macacine herpesvirus 1, complete genome
+NC_004367.1	heldout	Callitrichine herpesvirus 3 strain CJ0149, complete genome
+NC_004065.1	heldout	Murid herpesvirus 1, complete genome
+NC_002512.2	train	Rat cytomegalovirus Maastricht, complete genome
+NC_003521.1	train	Panine herpesvirus 2 strain Heberling, complete genome
+NC_002794.1	train	Tupaiid herpesvirus 1, complete genome
+NC_002641.1	heldout	Meleagrid herpesvirus 1, complete genome
+NC_002577.1	train	Gallid herpesvirus 3, complete genome
+NC_002531.1	heldout	Alcelaphine herpesvirus 1, complete genome
+NC_000898.1	heldout	Human herpesvirus 6B, complete genome
+NC_001987.1	train	Ateline herpesvirus 3 complete genome
+NC_076102.1	train	Diachasmimorpha longicaudata entomopoxvirus, complete genome
+NC_003310.1	train	Monkeypox virus, complete genome
+NC_055231.1	heldout	Orthopoxvirus Abatino, complete genome
+NC_055230.1	train	Akhmeta virus isolate Akhmeta_2013-88, complete genome
+NC_055229.1	train	Eastern grey kangaroopox virus strain Sunshine Coast, complete genome
+NC_036582.1	train	Flamingopox virus FGPVKD09, complete genome
+NC_035469.1	train	NY_014 poxvirus strain 2013, complete genome
+NC_035468.1	heldout	Murmansk poxvirus strain LEIV-11411, complete genome
+NC_030656.1	heldout	Pteropox virus strain Australia, complete genome
+NC_066642.1	train	Horsepox virus, complete genome
+NC_055228.1	train	Western grey kangaroopox virus strain Western Australia, complete genome
+NC_037656.1	heldout	Sea otter poxvirus strain ELK, complete genome
+NC_035460.1	heldout	Eptesipox virus strain Washington, complete genome
+NC_035188.1	heldout	Seal parapoxvirus isolate AFK76s1, complete genome
+NC_031038.1	train	Skunkpox virus strain WA, complete genome
+NC_027707.1	heldout	Salmon gill poxvirus, complete genome
+NC_025963.1	heldout	Parapoxvirus red deer/HL953 strain HL953, complete genome
+NC_024446.1	train	Penguinpox virus isolate PSan92, complete genome
+NC_021249.1	train	Choristoneura rosaceana entomopoxvirus 'L', complete genome
+NC_021247.1	heldout	Adoxophyes honmai enomopoxvirus 'L', complete genome
+NC_021246.1	heldout	Mythimna separata entomopoxvirus 'L', complete genome
+NC_016924.1	train	Cotia virus SPAn232, complete genome
+NC_015960.1	train	Yoka poxvirus, complete genome
+NC_008030.1	train	Nile crocodilepox virus, complete genome
+NC_006966.1	train	Deerpox virus W-848-83, complete genome
+NC_005337.1	heldout	Bovine papular stomatitis virus, complete genome
+NC_004003.1	heldout	Goatpox virus Pellor, complete genome
+NC_003027.1	train	Lumpy skin disease virus NI-2490, complete genome
+NC_002642.1	train	Yaba-like disease virus, complete genome
+NC_032111.1	heldout	BeAn 58058 virus, complete genome
+NC_031033.1	train	Volepox virus strain CA, complete genome
+NC_027213.1	heldout	Raccoonpox virus, complete genome
+NC_024447.1	train	Pigeonpox virus isolate FeP2, complete genome
+NC_023426.1	train	Anomala cuprea entomopoxvirus DNA, complete genome, strain: CV6M
+NC_021248.1	train	Choristoneura biennis entomopoxvirus 'L', complete genome
+NC_008291.1	train	Taterapox virus, complete genome
+NC_005336.1	train	Orf virus, complete genome
+NC_005309.1	train	Canarypox virus, complete genome
+NC_005179.1	train	Yaba monkey tumor virus, complete genome
+NC_003663.2	heldout	Cowpox virus, complete genome
+NC_004105.1	heldout	Ectromelia virus, complete genome
+NC_004002.1	train	Sheeppox virus 17077-99, complete genome
+NC_003391.1	heldout	Camelpox virus, complete genome
+NC_003389.1	train	Swinepox virus, complete genome
+NC_001132.2	train	Myxoma virus, complete genome
+NC_002520.1	train	Amsacta moorei entomopoxvirus 'L', complete genome
+NC_002188.1	train	Fowlpox virus, complete genome
+NC_001266.1	train	Rabbit fibroma virus, complete genome
+NC_001993.1	train	Melanoplus sanguinipes entomopoxvirus, complete genome
+NC_001731.1	train	Molluscum contagiosum virus subtype 1, complete genome
+NC_001611.1	heldout	Variola virus, complete genome
+NC_035797.1	train	Squirrelpox virus Berlin_2015, complete genome
+NC_063383.1	train	Monkeypox virus, complete genome
+NC_028238.1	train	Turkeypox virus strain TKPV-HU1124/2011, complete genome
+NC_022563.1	train	Squirrel poxvirus strain Red squirrel UK complete genome
+NC_013804.1	train	Pseudocowpox virus, complete genome
+NC_006998.1	train	Vaccinia virus, complete genome
+NC_044935.1	heldout	Porcine adenovirus 3 strain 6618, complete genome
+NC_076486.1	train	Bearded dragon adenovirus 1 strain BD5H2, complete genome
+NC_076398.1	train	Siadenovirus IDL19-3602, complete genome
+NC_076340.1	train	MAG: Corella adenovirus 1 isolate CorAdV1/Melbourne/2015, complete genome
+NC_075973.1	train	Guinea pig adenovirus strain AUS96, complete genome
+NC_075965.1	heldout	Porcine mastadenovirus B isolate HNU1, complete genome
+NC_075488.1	train	Fowl adenovirus C complete genome, isolate KR5
+NC_075454.1	train	UNVERIFIED: Rousettus aegyptiacus adenovirus isolate 3085, complete genome
+NC_075453.1	train	Eidolon helvum adenovirus DNA, complete genome, isolate: 06-106
+NC_075452.1	train	Psittacine adenovirus 1 isolate 18VIR149_ITA_2018, complete genome
+NC_075450.1	train	Bat mastadenovirus Vs9 DNA, complete genome
+NC_075448.1	train	White sturgeon adenovirus 1 isolate WSAdV1/1996, complete genome
+NC_035072.1	train	Bat mastadenovirus WIV18, complete genome
+NC_034626.1	train	Bat mastadenovirus WIV17, complete genome
+NC_038332.1	train	Fowl adenovirus 6 strain CR119, complete genome
+NC_024486.1	train	Duck adenovirus 2 strain GR, complete genome
+NC_022613.1	heldout	Turkey adenovirus 5 isolate 1277BT, complete genome
+NC_022612.1	heldout	Turkey adenovirus 4 isolate TNI1, complete genome
+NC_021221.1	train	Fowl adenovirus 5 strain 340, complete genome
+NC_017979.1	train	Goose adenovirus 4, complete genome
+NC_014564.2	heldout	Turkey adenovirus 1, complete genome
+NC_015323.1	train	Fowl adenovirus C, complete genome
+NC_014969.1	train	Fowl adenovirus E, complete genome
+NC_004037.2	train	Ovine adenovirus 7, complete genome
+NC_000899.1	train	Fowl adenovirus D, complete genome
+NC_001720.1	train	Fowl adenovirus A, complete genome
+NC_016895.2	train	Bat adenovirus 3 strain TJM, complete genome
+NC_021168.1	train	Baboon adenovirus 3 isolate BaAdV-2, complete genome
+NC_030116.1	train	Chinstrap penguin adenovirus 2 isolate CSPAdV_2, complete genome
+NC_055526.1	train	Ovine adenovirus 8 strain 7508, complete genome
+NC_044936.1	train	Tree shrew adenovirus 1, complete genome
+NC_040811.1	train	Polar bear mastadenovirus 1 isolate BK35, complete genome
+NC_039032.1	train	Psittacine aviadenovirus B isolate CS15-4016, complete genome
+NC_035619.1	heldout	Odocoileus adenovirus 1, complete genome
+NC_034834.1	train	Deer mastadenovirus B isolate 1319, complete genome
+NC_034382.1	train	Cynomolgus adenovirus 1 isolate UK/UK-1/2004, complete genome
+NC_032105.1	heldout	Simian mastadenovirus WIV19, complete genome
+NC_031948.1	train	Bat mastadenovirus G isolate 250-A, complete genome
+NC_031503.1	train	Pigeon adenovirus 2 isolate YPDS-Y-V1.A19.11-2013, complete genome
+NC_030874.1	train	Bat mastadenovirus WIV13, complete genome
+NC_030860.1	train	Bat mastadenovirus WIV12, complete genome
+NC_030792.1	heldout	Equine adenovirus 1 strain M1, complete genome
+NC_029902.1	train	Bat mastadenovirus WIV11, complete genome
+NC_029899.1	train	Bat mastadenovirus WIV10, complete genome
+NC_029898.1	train	Bat mastadenovirus WIV9, complete genome
+NC_028113.1	heldout	Simian adenovirus 8 strain P-5, complete genome
+NC_028107.1	heldout	Simian adenovirus 19 strain AA153, complete genome
+NC_028105.1	heldout	Simian adenovirus 16 strain C-8, complete genome
+NC_028103.1	heldout	Simian adenovirus 13 strain P-9, complete genome
+NC_027708.1	train	Skunk adenovirus PB1, complete genome
+NC_027705.1	heldout	Equine adenovirus 2 isolate EAdV2.385/75.9, complete genome
+NC_025962.1	train	Psittacine adenovirus 3 isolate HKU/Parrot19, complete genome
+NC_025678.1	heldout	Simian adenovirus DM-2014 isolate 23336, complete genome
+NC_024684.1	heldout	Lizard adenovirus 2 isolate 23-06, complete genome
+NC_024474.1	train	Pigeon adenovirus 1 complete genome, strain IDA4
+NC_024150.1	train	California sea lion adenovirus 1 strain Zc11-030, complete genome
+NC_022266.1	heldout	Simian adenovirus 18, complete genome
+NC_020487.1	train	Titi monkey adenovirus ECC-2011, complete genome
+NC_020485.1	heldout	Simian adenovirus 20 strain ATCC VR-541, complete genome
+NC_017825.1	heldout	Chimpanzee adenovirus Y25, complete genome
+NC_016437.1	train	South polar skua adenovirus-1, complete genome
+NC_015932.1	train	Bat adenovirus 2, complete genome
+NC_015455.1	heldout	Raptor adenovirus A, complete genome
+NC_015225.1	heldout	Simian adenovirus 49, complete genome
+NC_014899.1	heldout	Murine adenovirus 2, complete genome
+NC_012959.1	heldout	Human adenovirus 54, complete genome
+NC_012584.1	heldout	Murine adenovirus 3, complete genome
+NC_011202.1	heldout	Human adenovirus B2, complete genome
+NC_011203.1	heldout	Human adenovirus B1, complete genome
+NC_010956.1	heldout	Human adenovirus D, complete genome
+NC_009989.1	train	Snake adenovirus, complete genome
+NC_006879.1	heldout	Simian adenovirus 1, complete genome
+NC_003266.2	heldout	Human adenovirus E, complete genome
+NC_006144.1	heldout	Simian adenovirus 3, complete genome
+NC_002685.2	heldout	Bovine adenovirus D, complete genome
+NC_002702.1	heldout	Porcine adenovirus 5, complete genome
+NC_002513.1	heldout	Bovine adenovirus type 2, complete genome
+NC_002501.1	heldout	Frog adenovirus 1, complete genome
+NC_001958.1	train	Hemorrhagic enteritis virus, complete genome
+NC_001876.1	heldout	Bovine adenovirus 3 complete genome
+NC_001813.1	train	Duck adenovirus A, complete genome
+NC_001734.1	heldout	Canine adenovirus, complete genome
+NC_001460.1	heldout	Human adenovirus A, complete genome
+NC_001454.1	heldout	Human adenovirus F, complete genome
+NC_000942.1	heldout	Murine adenovirus A, complete genome
+NC_020074.1	heldout	Bovine adenovirus 6 strain 671130, complete genome
+NC_035207.1	train	Red squirrel adenovirus 1 strain DE/2013/Sciurus vulgaris/2013Pa405-00252, complete genome
+AC_000191.1	heldout	Bovine adenovirus A, complete genome
+AC_000190.1	train	Tree shrew adenovirus 1, complete genome
+AC_000189.1	heldout	Porcine adenovirus 3, complete genome
+AC_000020.1	heldout	Canine adenovirus type 2, complete genome
+AC_000019.1	heldout	Human adenovirus type 35, complete genome
+AC_000018.1	heldout	Human adenovirus type 7, complete genome
+AC_000017.1	heldout	Human adenovirus type 1, complete genome
+AC_000016.1	heldout	Turkey adenovirus A, complete genome
+AC_000014.1	train	Fowl adenovirus A, complete genome
+AC_000013.1	train	Fowl adenovirus D, complete genome
+AC_000012.1	heldout	Murine adenovirus A, complete genome
+AC_000011.1	heldout	Simian adenovirus 25, complete genome
+AC_000010.1	heldout	Simian adenovirus 21, complete genome
+NC_075434.1	train	Simiispumavirus macfas proviral DNA, complete genome, isolate: Cy5061
+NC_076947.1	heldout	Equine infectious anemia virus clone pSPEIAV19, complete genome
+NC_001364.1	train	Western chimpanzee simian foamy virus, complete genome
+NC_039023.1	train	Brown greater galago prosimian foamy virus, complete genome
+NC_000858.1	train	Primate T-lymphotropic virus 1, complete genome
+NC_043445.1	train	Guenon simian foamy virus isolate AG16, complete genome
+NC_001654.1	train	Jembrana disease virus Tabanan/87 strain, complete genome
+NC_039242.1	train	Feline foamy virus DNA, complete genome
+NC_039238.1	train	Rhesus macaque simian foamy virus isolate SFVmmu_K3T, complete genome
+NC_039031.1	train	Yellow-breasted capuchin simian foamy virus isolate Z17, complete genome
+NC_039030.1	train	White-tufted-ear marmoset simian foamy virus, complete genome
+NC_039029.1	train	Western lowland gorilla simian foamy virus, complete genome
+NC_039028.1	train	Squirrel monkey foamy virus isolate 1224, complete genome
+NC_039027.1	train	Spider monkey foamy virus strain ATCC VR-940, complete genome
+NC_039026.1	heldout	Japanese macaque simian foamy virus proviral DNA, complete genome, clone: JM356
+NC_039025.1	train	Eastern chimpanzee simian foamy virus clone pHSRV13, complete genome
+NC_039024.1	train	Central cimpanzee simian foamy virus isolate BAD327, complete genome
+NC_039022.1	train	Puma feline foamy virus isolate FFVpc-X102, complete genome
+NC_031326.1	heldout	Simian retrovirus 8 strain SRV8/SUZ/2012, complete genome
+NC_027117.1	train	Desmodus rotundus endogenous retrovirus isolate 824, complete genome
+NC_022517.1	train	Baboon endogenous virus strain M7 proviral DNA, complete genome
+NC_023153.1	heldout	Citrus endogenous pararetrovirus clone CB16-3, complete genome
+NC_022518.1	heldout	Human endogenous retrovirus K113 complete genome
+NC_007815.2	train	PreXMRV-1 provirus, complete genome
+NC_015116.1	heldout	Avian leukemia virus isolate SCDY1, complete genome
+NC_014474.1	heldout	Simian retrovirus 4 strain SRV4/TEX/2009/V1, complete genome
+NC_011800.1	heldout	Human T-lymphotropic virus 4, complete genome
+NC_011546.1	heldout	Simian T-cell lymphotropic virus 6 strain Cmo8699AB, complete genome
+NC_010955.1	heldout	Xenopus laevis endogenous retrovirus Xen1, complete genome
+NC_010820.1	heldout	Simian foamy virus 3, complete genome
+NC_009889.1	train	RD114 retrovirus, complete genome
+NC_008094.1	train	Y73 sarcoma virus, complete genome
+NC_007654.1	train	Atlantic salmon swim bladder sarcoma virus, complete genome
+NC_007015.1	train	Ovine enzootic nasal tumour virus, complete genome
+NC_006934.1	heldout	Reticuloendotheliosis virus strain HA9901 from China, complete genome
+NC_005947.1	heldout	Avian endogenous retrovirus EAV-HP, complete genome
+NC_004994.2	train	Enzootic nasal tumour virus of goats, complete genome
+NC_004455.1	heldout	Simian immunodeficiency virus 2 isolate SIVmnd-2, complete genome
+NC_003059.1	heldout	Porcine endogenous retrovirus E, complete genome
+NC_002201.1	heldout	Equine foamy virus, complete genome
+NC_001940.1	train	Feline leukemia virus, complete genome
+NC_001867.1	train	Walleye dermal sarcoma virus, complete genome
+NC_001866.1	heldout	Avian myelocytomatosis virus, complete genome
+NC_001831.1	heldout	Bovine foamy virus, complete genome
+NC_001815.1	heldout	Simian T-lymphotropic virus 2, complete genome
+NC_001802.1	heldout	Human immunodeficiency virus 1, complete genome
+NC_001724.1	train	Snakehead retrovirus, complete genome
+NC_001722.1	heldout	Human immunodeficiency virus 2, complete genome
+NC_001702.1	heldout	Murine type C retrovirus, complete genome
+NC_001618.1	train	UR2 sarcoma virus, complete genome
+NC_001550.1	heldout	Mason-Pfizer monkey virus, complete genome
+NC_001549.1	heldout	Simian immunodeficiency virus, complete genome
+NC_001514.1	train	Squirrel monkey retrovirus - HLB, complete genome
+NC_001511.1	train	Ovine lentivirus, complete genome
+NC_001506.1	heldout	Murine osteosarcoma virus, complete genome
+NC_001503.1	train	Mouse mammary tumor virus, complete genome
+NC_001502.1	train	Moloney murine sarcoma virus, complete genome
+NC_001501.1	train	Moloney murine leukemia virus, complete genome
+NC_001500.1	train	Spleen focus-forming virus, complete genome
+NC_001499.1	train	Abelson murine leukemia virus, complete genome
+NC_001494.1	train	Jaagsiekte sheep retrovirus, complete genome
+NC_001482.1	train	Feline immunodeficiency virus complete genome
+NC_001463.1	train	Caprine arthritis-encephalitis virus, complete genome
+NC_001452.1	heldout	Visna/Maedi virus strain kv1772, complete genome
+NC_001436.1	heldout	Human T-lymphotropic virus 1, complete genome
+NC_001414.1	heldout	Bovine leukemia virus, complete genome
+NC_001408.1	heldout	Avian leukosis virus - RSA, complete genome
+NC_001407.1	train	Rous sarcoma virus, complete genome
+NC_001403.1	heldout	Fujinami sarcoma virus, complete genome
+NC_001402.1	heldout	Avian carcinoma virus, complete genome
+NC_001362.1	train	Friend murine leukemia virus FB29 complete genome
+NC_076685.1	train	Alphacoronavirus sp. isolate WA3607, complete genome
+NC_076684.1	train	Alphacoronavirus sp. isolate WA2028, complete genome
+NC_055953.1	train	Bat alphacoronavirus isolate AMA_L_F, complete genome
+NC_054015.1	train	Tylonycteris bat coronavirus HKU33 strain GZ151867, complete genome
+NC_054004.1	train	Hipposideros pomona bat coronavirus CHB25 isolate CHB0025, complete genome
+NC_054003.1	train	Alphacoronavirus sp. isolate WA1087, complete genome
+NC_048214.1	train	Duck coronavirus isolate DK/GD/27/2014, complete genome
+NC_046965.1	heldout	Canada goose coronavirus strain Cambridge_Bay_2017, complete genome
+NC_046964.1	train	Alphacoronavirus Bat-CoV/P.kuhlii/Italy/3398-19/2015, complete genome
+NC_032730.1	train	Lucheng Rn rat coronavirus isolate Lucheng-19, complete genome
+NC_030292.1	train	Ferret coronavirus isolate FRCoV-NL-2010, complete genome
+NC_018871.1	heldout	Rousettus bat coronavirus HKU10, complete genome
+NC_016992.1	train	Sparrow coronavirus HKU17, complete genome
+NC_016996.1	heldout	Common moorhen coronavirus HKU21, complete genome
+NC_016995.1	train	Wigeon coronavirus HKU20, complete genome
+NC_016993.1	train	Magpie-robin coronavirus HKU18, complete genome
+NC_014470.1	train	Bat coronavirus BM48-31/BGR/2008, complete genome
+NC_010438.1	heldout	Miniopterus bat coronavirus HKU8, complete genome
+NC_009988.1	heldout	Rhinolophus bat coronavirus HKU2, complete genome
+NC_009657.1	train	Scotophilus bat coronavirus 512, complete genome
+NC_028752.1	train	Camel alphacoronavirus isolate camel/Riyadh/Ry141/2015, complete genome
+NC_005831.2	heldout	Human Coronavirus NL63, complete genome
+NC_039208.1	heldout	Porcine coronavirus HKU15 strain HKU15-155, complete genome
+NC_016991.1	heldout	White-eye coronavirus HKU16, complete genome
+NC_002645.1	heldout	Human coronavirus 229E, complete genome
+NC_048212.1	train	Bat coronavirus, complete genome
+NC_038294.1	train	Betacoronavirus England 1 isolate H123990006, complete genome
+NC_009021.1	heldout	Rousettus bat coronavirus HKU9, complete genome
+NC_034440.1	train	Bat coronavirus isolate PREDICT/PDF-2180, complete genome
+NC_009020.1	train	Pipistrellus bat coronavirus HKU5, complete genome
+NC_009019.1	train	Tylonycteris bat coronavirus HKU4, complete genome
+NC_006577.2	heldout	Human coronavirus HKU1, complete genome
+NC_004718.3	train	SARS coronavirus Tor2, complete genome
+NC_026011.1	train	Betacoronavirus HKU24 strain HKU24-R05005I, complete genome
+NC_017083.1	train	Rabbit coronavirus HKU14, complete genome
+NC_001846.1	heldout	Murine hepatitis virus strain MHV-A59 C12 mutant, complete genome
+NC_046954.1	train	Rodent coronavirus isolate RtMruf-CoV-2/JL2014, complete genome
+NC_012936.1	train	Rat coronavirus Parker, complete genome
+AC_000192.1	heldout	Murine hepatitis virus strain JHM, complete genome
+NC_003045.1	heldout	Bovine coronavirus isolate BCoV-ENT, complete genome
+NC_048217.1	heldout	Murine hepatitis virus strain A59, complete genome
+NC_006213.1	heldout	Human coronavirus OC43 strain ATCC VR-759, complete genome
+NC_030886.1	heldout	Rousettus bat coronavirus isolate GCCDC1 356, complete genome
+NC_025217.1	train	Bat Hp-betacoronavirus/Zhejiang2013, complete genome
+NC_019843.3	train	Middle East respiratory syndrome-related coronavirus isolate HCoV-EMC/2012, complete genome
+NC_039207.1	train	Betacoronavirus Erinaceus/VMC/DEU/2012 isolate ErinaceusCoV/2012-174/GER/2012, complete genome
+NC_045512.2	heldout	Severe acute respiratory syndrome coronavirus 2 isolate Wuhan-Hu-1, complete genome
+NC_048216.1	train	NL63-related bat coronavirus strain BtKYNL63-9b, complete genome
+NC_048213.1	train	Infectious bronchitis virus isolate Ind-TN92-03, complete genome
+NC_038861.1	train	Transmissible gastroenteritis virus complete genome, genomic RNA
+NC_011547.1	train	Bulbul coronavirus HKU11-934, complete genome
+NC_034972.1	train	Coronavirus AcCoV-JC34, complete genome
+NC_032107.1	train	NL63-related bat coronavirus strain BtKYNL63-9a, complete genome
+NC_028833.1	train	BtNv-AlphaCoV/SC2013, complete genome
+NC_028824.1	train	BtRf-AlphaCoV/YN2012, complete genome
+NC_028814.1	train	BtRf-AlphaCoV/HuB2013, complete genome
+NC_028811.1	heldout	BtMr-AlphaCoV/SAX2011, complete genome
+NC_028806.1	train	Swine enteric coronavirus strain Italy/213306/2009, complete genome
+NC_023760.1	heldout	Mink coronavirus strain WD1127, complete genome
+NC_022103.1	train	Bat coronavirus CDPHE15/USA/2006, complete genome
+NC_016994.1	train	Night-heron coronavirus HKU19, complete genome
+NC_002306.3	train	Feline infectious peritonitis virus, complete genome
+NC_011550.1	train	Munia coronavirus HKU13-3514, complete genome
+NC_011549.1	train	Thrush coronavirus HKU12-600, complete genome
+NC_010800.1	heldout	Turkey coronavirus, complete genome
+NC_010646.1	train	Beluga Whale coronavirus SW1, complete genome
+NC_010437.1	train	Bat coronavirus 1A, complete genome
+NC_003436.1	heldout	Porcine epidemic diarrhea virus, complete genome
+NC_001451.1	heldout	Avian infectious bronchitis virus, complete genome
+NC_077024.1	train	Dongyang pangolin virus isolate DYAJ1, complete genome
+NC_077026.1	heldout	Phocoena pestivirus isolate NS170385, complete genome
+NC_076032.1	heldout	Bovine viral diarrhea virus 2 strain XJ-04, complete genome
+NC_040815.1	heldout	Hepacivirus P isolate RHV-GS2015, complete genome
+NC_040645.1	train	Culex Flavi-like virus strain CFVL/San Francisco, complete genome
+NC_040589.1	train	Diatom colony associated ssRNA virus 1 genomic RNA, complete genome
+NC_040555.1	train	Lumpfish flavivirus, complete genome
+NC_021153.1	train	Rodent hepacivirus, complete genome
+NC_012532.1	train	Zika virus, complete genome
+NC_009942.1	train	West Nile virus lineage 1, complete genome
+NC_001563.2	train	West Nile virus lineage 2, complete genome
+NC_038432.1	heldout	Hepacivirus N, complete genome
+NC_038430.1	heldout	Hepacivirus K, complete genome
+NC_038428.1	heldout	Hepacivirus I, complete genome
+NC_038427.1	heldout	Hepacivirus F, complete genome
+NC_031916.1	heldout	Hepacivirus L, complete genome
+NC_001475.2	heldout	Dengue virus 3, complete genome
+NC_001474.2	heldout	Dengue virus 2, complete genome
+NC_004102.1	train	Hepatitis C virus genotype 1, complete genome
+NC_002640.1	heldout	Dengue virus 4, complete genome
+NC_024018.2	train	Pronghorn antelope pestivirus, complete genome
+NC_012735.1	train	Wesselsbron virus strain SAH177, complete genome
+NC_012534.1	train	Bagaza virus strain DakAr B209, complete genome
+NC_012533.1	train	Kedougou virus strain DakAar D1470, complete genome
+NC_040788.1	train	Kampung Karu virus isolate SWK_P44, complete genome
+NC_040776.1	heldout	Rocio virus strain SPH 34675, complete genome
+NC_040682.1	train	Culex theileri flavivirus, complete genome
+NC_040610.1	heldout	Nanay virus strain PRD316/PER/09, complete genome
+NC_030791.1	train	Hepatitis C virus genotype 7, complete genome
+NC_035889.1	train	Zika virus isolate ZIKV/H. sapiens/Brazil/Natal/2015, complete genome
+NC_034151.1	train	T'Ho virus strain T'Ho-Mex07, complete genome
+NC_034007.1	heldout	Phnom Penh bat virus strain 30834_A38, complete genome
+NC_027819.1	train	Mercadeo virus isolate ER-M10, complete genome
+NC_027817.1	heldout	Parramatta River virus isolate 92-B115745, complete genome
+NC_017086.1	train	Chaoyang virus, complete genome
+NC_016997.1	train	Donggang virus, complete genome
+NC_009028.2	heldout	Ilheus virus, complete genome
+NC_009029.2	train	Kokobera virus, complete genome
+NC_012932.1	heldout	Aedes flavivirus genomic RNA, complete genome, strain: Narita-21
+NC_012671.1	train	Quang Binh virus, complete genome
+NC_008604.2	train	Culex flavivirus, complete genome
+NC_007580.2	train	Saint Louis encephalitis virus, complete genome
+NC_005064.1	heldout	Kamiti River virus, complete genome
+NC_027999.1	train	Paraiso Escondido virus isolate Ecuador2012, complete genome
+NC_027709.1	train	Spanish goat encephalitis virus isolate AstGoatIREC2011, complete genome
+NC_026624.1	train	Sokoluk virus strain LEIV-400K, complete genome
+NC_026620.1	train	Jutiapa virus strain JG-128, complete genome
+NC_021069.1	train	Mosquito flavivirus isolate LSFlaviV-A20-09, complete genome
+NC_008718.1	train	Entebbe bat virus, complete genome
+NC_008719.1	heldout	Sepik virus, complete genome
+NC_005062.1	heldout	Omsk hemorrhagic fever virus, complete genome
+NC_004119.1	heldout	Montana myotis leukoencephalitis virus, complete genome
+NC_003690.1	heldout	Langat virus, complete genome
+NC_003687.1	train	Powassan virus, complete genome
+NC_003635.1	heldout	Modoc virus, complete genome
+NC_000943.1	train	Murray Valley encephalitis virus, complete genome
+NC_001809.1	heldout	Louping ill virus, complete genome
+NC_001672.1	heldout	Tick-borne encephalitis virus, complete genome
+NC_001655.1	train	Hepatitis GB virus B, complete genome
+NC_002031.1	heldout	Yellow fever virus, complete genome
+NC_009827.1	train	Hepatitis C virus genotype 6, complete genome
+NC_009823.1	train	Hepatitis C virus genotype 2, complete genome
+NC_001477.1	heldout	Dengue virus 1, complete genome
+NC_034204.1	train	Menghai flavivirus isolate MHAedFV1, complete genome
+NC_038912.1	train	Classical swine fever virus, strain Alfort/187 complete genome
+NC_038433.1	train	Theiler's disease-associated virus isolate HorseA1_serum, complete genome
+NC_035432.1	train	Linda virus strain Austria1, complete genome
+NC_035118.1	train	Karumba virus isolate KRBV 1892, complete genome
+NC_034017.1	heldout	Xishuangbanna aedes flavivirus, complete genome
+NC_031327.1	train	Anopheles flavivirus variant 1, complete genome
+NC_024299.2	train	Nienokoue virus isolate B51/CI/2004, complete genome
+NC_001564.2	heldout	Cell fusing agent virus strain Galveston, complete genome
+NC_030290.1	train	Culiseta flavivirus strain 502-13, complete genome
+NC_024017.1	heldout	Nhumirim virus strain BrMS-MQ10, complete genome
+NC_023176.1	heldout	Porcine pestivirus isolate Bungowannah, complete genome
+NC_021154.1	train	Rodent pegivirus isolate CC61, complete genome
+NC_020902.1	heldout	Equine Pegivirus 1 isolate C0035, complete genome
+NC_018713.1	train	Pestivirus strain Aydin/04-TR, complete genome
+NC_009026.2	heldout	Bussuquara virus, complete genome
+NC_012812.1	heldout	Bovine viral diarrhea virus 3 Th/04_KhonKaen, complete genome
+NC_005039.1	train	Yokose virus, complete genome
+NC_003679.1	train	Border disease virus X818, complete genome
+NC_003678.1	train	Pestivirus giraffe-1 H138 complete genome
+NC_002657.1	train	Classical swine fever virus, complete genome
+NC_001837.1	train	Hepatitis GB virus A, complete genome
+NC_001710.1	train	GB virus C/Hepatitis G virus, complete genome
+NC_001461.1	heldout	Bovine viral diarrhea virus 1, complete genome
+NC_076951.1	heldout	Belerina virus isolate HH114, complete genome
+NC_076941.1	train	Ruloma virus isolate TA502, complete genome
+NC_077219.1	heldout	Giant squirrel respirovirus isolate GSqRV/LKA/2009 genome assembly, complete genome: monopartite
+NC_076625.1	train	Bat paramyxovirus strain Bat-PV-17770, complete genome
+NC_076624.1	train	Bat paramyxovirus strain Bat-PV-16797, complete genome
+NC_076605.1	train	Feline paramyxovirus 163 viral cRNA, nearly complete genome
+NC_076597.1	train	Rodent paramyxovirus isolate RtAp-ParaV/NX2015, complete genome
+NC_076397.1	heldout	Avian metaavulavirus 21 isolate APMV/dove/Taiwan/AHRI33/2009, complete genome
+NC_076269.1	heldout	Salmon aquaparamyxovirus strain A, complete genome
+NC_076003.1	heldout	Avian paramyxovirus 17 isolate Cheonsu1510, complete genome
+NC_075446.1	heldout	Human parainfluenza virus 3 strain ZHYMgz01, complete genome
+NC_075404.1	train	Newcastle disease virus isolate chicken/N. Ireland/Ulster/67, complete genome
+NC_075392.1	train	Sendai virus genomic RNA, complete genome, strain:Nagoya
+NC_074766.1	heldout	Avian paramyxovirus 4 isolate APMV-4/KR/YJ/06, complete genome
+NC_055508.1	train	Alston virus isolate Alstonville, complete genome
+NC_055168.1	train	Pohorje myodes paramyxovirus 1 isolate TT02/05, complete genome
+NC_055167.1	heldout	Bank vole virus strain RP-12, complete genome
+NC_002200.1	heldout	Mumps orthorubulavirus genomic RNA, complete genome
+NC_025349.3	heldout	Avian paramyxovirus penguin/Falkland Islands/324/2007, complete genome
+NC_043540.1	train	Mount Mabu Lophuromys virus 2 isolate MOZ135_2, complete genome
+NC_043539.1	train	Mount Mabu Lophuromys virus 1 isolate MOZ135_1, complete genome
+NC_040796.1	heldout	Avian paramyxovirus 20 isolate APMV-20/gull/Kazakhstan/5976/2014, complete genome
+NC_039230.1	heldout	Avian paramyxovirus 2 strain APMV-2/Chicken/California/Yucaipa/56, complete genome
+NC_039223.1	train	Newcastle disease virus isolate JSD0812, complete genome
+NC_039198.1	train	Teviot virus isolate Cedar Grove, complete genome
+NC_039197.1	heldout	Menangle virus isolate Australia/bat/2009/Cedar Grove, complete genome
+NC_039196.1	train	Feline morbillivirus strain 761U, complete genome
+NC_039195.1	heldout	Avian paramyxovirus 8 strain goose/Delaware/1053/76, complete genome
+NC_039194.1	heldout	Avian paramyxovirus 6 strain APMV-6/Goose/FarEast/4440/2003, complete genome
+NC_039019.1	heldout	Antarctic penguin virus C, complete genome
+NC_039018.1	heldout	Antarctic penguin virus B, complete genome
+NC_039017.1	heldout	Antarctic penguin virus A, complete genome
+NC_039016.1	heldout	Avian paramyxovirus UPO216 isolate APMV-15/WB/Kr/UPO216/2014, complete genome
+NC_039015.1	heldout	Avian paramyxovirus 14 isolate APMV14/duck/Japan/11OG0352/2011, complete genome
+NC_038271.1	train	Bat Paramyxovirus Epo_spe/AR1/DRC/2009, complete genome
+NC_038270.1	heldout	Simian Agent 10, complete genome
+NC_030231.1	heldout	Avian paramyxovirus goose/Shimane/67/2000 viral cRNA, complete genome
+NC_028362.1	train	Caprine parainfluenza virus 3 strain JS2013, complete genome
+NC_028249.1	train	Phocine distemper virus strain PDV/Wadden_Sea.NLD/1988, complete genome
+NC_025410.1	train	Tuhoko virus 1, complete genome
+NC_025407.1	heldout	Avian paramyxovirus 11 isolate common_snipe/France/100212/2010, complete genome
+NC_025404.1	train	Achimota virus 2, complete genome
+NC_025403.1	train	Achimota virus 1, complete genome
+NC_025402.1	heldout	Porcine parainfluenza virus 1 strain S206N, complete genome
+NC_025390.1	heldout	Avian paramyxovirus 9 strain duck/New York/22/1978, complete genome
+NC_025386.1	train	Salem virus, complete genome
+NC_025352.1	train	Mojiang virus isolate Tongguan1, complete genome
+NC_025373.1	heldout	Avian paramyxovirus 3 strain turkey/Wisconsin/68, complete genome
+NC_025363.1	heldout	Avian paramyxovirus 12 isolate Wigeon/Italy/3920_1/2005, complete genome
+NC_025361.1	heldout	Avian paramyxovirus 5 strain budgerigar/Kunitachi/74, complete genome
+NC_025360.1	train	Atlantic salmon paramyxovirus isolate ASPV/Yrkje371/95, complete genome
+NC_025355.1	train	Tailam virus strain TL8K, complete genome
+NC_025351.1	heldout	Cedar virus isolate CG1a, complete genome
+NC_025350.1	train	Tuhoko virus 3, complete genome
+NC_025348.1	train	Tuhoko virus 2, complete genome
+NC_025347.1	heldout	Avian paramyxovirus 7 strain APMV-7/dove/Tennessee/4/75, complete genome
+NC_025343.1	train	Sosuga virus isolate 2012, complete genome
+NC_025256.1	train	Bat Paramyxovirus Eid_hel/GH-M74a/GHA/2009, complete genome
+NC_001906.3	heldout	Hendra virus, complete genome
+NC_021928.1	heldout	Human parainfluenza virus 4a viral cRNA, complete genome, strain: M-25
+NC_019531.1	heldout	Avian paramyxovirus 4 strain APMV-4/duck/Delaware/549227/2010, complete genome
+NC_017937.1	train	Nariva virus, complete genome
+NC_009640.1	heldout	Porcine rubulavirus, complete genome
+NC_009489.1	train	Mapuera virus, complete genome
+NC_007803.1	heldout	Beilong virus, complete genome
+NC_007454.1	heldout	J-virus, complete genome
+NC_006383.2	train	Peste des petits ruminants virus complete genome
+NC_006296.2	train	Rinderpest virus (strain Kabete O), complete genome
+NC_006428.1	heldout	Simian virus 41, complete genome
+NC_005084.2	train	Fer-de-lance virus, complete genome
+NC_005339.1	train	Mossman virus, complete genome
+NC_005283.1	train	Dolphin morbillivirus, complete genome
+NC_005036.1	train	Goose paramyxovirus SF02, complete genome
+NC_004074.1	train	Tioman virus, complete genome
+NC_003461.1	heldout	Human parainfluenza virus 1, complete genome
+NC_003443.1	heldout	Human rubulavirus 2, complete genome
+NC_002728.1	train	Nipah virus, complete genome
+NC_001796.2	heldout	Human parainfluenza virus 3, complete genome
+NC_002199.1	train	Tupaia paramyxovirus, complete genome
+NC_002161.1	heldout	Bovine parainfluenza virus 3, complete genome
+NC_001921.1	heldout	Canine distemper virus, complete genome
+NC_001498.1	train	Measles virus, complete genome
+NC_001608.4	train	Marburg virus - Musoke, Kenya, 1980, complete genome
+NC_055510.1	heldout	Mengla dianlovirus isolate Rousettus-wt/CHN/2015/Sharen-Bat9447-1, complete genome
+NC_014373.1	heldout	Bundibugyo ebolavirus, complete genome
+NC_039345.1	train	Bombali ebolavirus isolate Bombali ebolavirus/Mops condylurus/SLE/2016/PREDICT_SLAB000156, complete genome
+NC_024781.1	train	Marburg marburgvirus isolate Ravn virus/H.sapiens-tc/KEN/1987/Kitum Cave-810040, complete genome
+NC_016144.1	train	Lloviu cuevavirus isolate Lloviu virus/M.schreibersii-wt/ESP/2003/Asturias-Bat86, complete genome
+NC_014372.1	train	Tai Forest ebolavirus isolate Tai Forest virus/H.sapiens-tc/CIV/1994/Pauleoula-CI, complete genome
+NC_006432.1	heldout	Sudan ebolavirus isolate Sudan virus/H.sapiens-tc/UGA/2000/Gulu-808892, complete genome
+NC_004161.1	heldout	Reston ebolavirus isolate Reston virus/M.fascicularis-tc/USA/1989/Philippines89-Pennsylvania, complete genome
+NC_002549.1	train	Zaire ebolavirus isolate Ebola virus/H.sapiens-tc/COD/1976/Yambuku-Mayinga, complete genome
+NC_007552.1	train	Adult diarrheal rotavirus strain J19, complete genome
+NC_007551.1	train	Adult diarrheal rotavirus strain J19, complete genome
+NC_007550.1	train	Adult diarrheal rotavirus strain J19, complete genome
+NC_007549.1	train	Adult diarrheal rotavirus strain J19, complete genome
+NC_016883.1	heldout	Spissistilus festinus reovirus segment 9, complete genome
+NC_016882.1	heldout	Spissistilus festinus reovirus segment 7, complete genome
+NC_016881.1	heldout	Spissistilus festinus reovirus segment 5, complete genome
+NC_016880.1	heldout	Spissistilus festinus reovirus segment 3, complete genome
+NC_016879.1	heldout	Spissistilus festinus reovirus segment 1, complete genome
+NC_016878.1	heldout	Spissistilus festinus reovirus segment 10, complete genome
+NC_016877.1	heldout	Spissistilus festinus reovirus segment 8, complete genome
+NC_016876.1	heldout	Spissistilus festinus reovirus segment 6, complete genome
+NC_016875.1	heldout	Spissistilus festinus reovirus segment 4, complete genome
+NC_016874.1	heldout	Spissistilus festinus reovirus segment 2, complete genome
+NC_011509.2	train	Rotavirus A segment 6, complete genome
+NC_011508.2	train	Rotavirus A segment 3, complete genome
+NC_011507.2	train	Rotavirus A segment 1, complete genome
+NC_011506.2	train	Rotavirus A segment 2, complete genome
+NC_011503.2	train	Rotavirus A segment 9, complete genome
+NC_011502.2	train	Rotavirus A segment 8, complete genome
+NC_011501.2	train	Rotavirus A segment 7, complete genome
+NC_011500.2	train	Rotavirus A segment 5, complete genome
+NC_011510.2	train	Rotavirus A segment 4, complete genome
+NC_015886.1	train	Baboon orthoreovirus segment S3, complete genome
+NC_015884.1	train	Baboon orthoreovirus segment S2, complete genome
+NC_015883.1	train	Baboon orthoreovirus segment S1, complete genome
+NC_015882.1	train	Baboon orthoreovirus segment M3, complete genome
+NC_015881.1	train	Baboon orthoreovirus segment M2, complete genome
+NC_015880.1	train	Baboon orthoreovirus segment M1, complete genome
+NC_015879.1	train	Baboon orthoreovirus segment L3, complete genome
+NC_015878.1	train	Baboon orthoreovirus segment L2, complete genome
+NC_015877.1	train	Baboon orthoreovirus segment L1, complete genome
+NC_015135.1	heldout	Avian orthoreovirus segment S4, complete genome
+NC_015134.1	heldout	Avian orthoreovirus segment S3, complete genome
+NC_015133.1	heldout	Avian orthoreovirus segment S2, complete genome
+NC_015132.1	heldout	Avian orthoreovirus segment S1, complete genome
+NC_015131.1	heldout	Avian orthoreovirus segment M3, complete genome
+NC_015130.1	heldout	Avian orthoreovirus segment M2, complete genome
+NC_015129.1	heldout	Avian orthoreovirus segment M1, complete genome
+NC_015128.1	heldout	Avian orthoreovirus segment L3, complete genome
+NC_015127.1	heldout	Avian orthoreovirus segment L2, complete genome
+NC_015126.1	heldout	Avian orthoreovirus segment L1, complete genome
+NC_014708.1	train	Southern rice black-streaked dwarf virus segment 5, complete genome
+NC_014709.1	train	Southern rice black-streaked dwarf virus segment 6, complete genome
+NC_014711.1	train	Southern rice black-streaked dwarf virus segment 8, complete genome
+NC_014710.1	train	Southern rice black-streaked dwarf virus segment 7, complete genome
+NC_014712.1	train	Southern rice black-streaked dwarf virus segment 9, complete genome
+NC_014713.1	train	Southern rice black-streaked dwarf virus segment 10, complete genome
+NC_014714.1	train	Southern rice black-streaked dwarf virus segment 1, complete genome
+NC_014715.1	train	Southern rice black-streaked dwarf virus segment 2, complete genome
+NC_014716.1	train	Southern rice black-streaked dwarf virus segment 3, complete genome
+NC_014717.1	train	Southern rice black-streaked dwarf virus segment 4, complete genome
+NC_014524.1	heldout	Great Island virus segment 3, complete genome
+NC_014530.1	heldout	Great Island virus segment 9, complete genome
+NC_014528.1	heldout	Great Island virus segment 7, complete genome
+NC_014527.1	heldout	Great Island virus segment 6, complete genome
+NC_014526.1	heldout	Great Island virus segment 5, complete genome
+NC_014525.1	heldout	Great Island virus segment 4, complete genome
+NC_014522.1	heldout	Great Island virus segment 1, complete genome
+NC_014523.1	heldout	Great Island virus segment 2, complete genome
+NC_014598.1	heldout	Raspberry latent virus segment S1, complete genome
+NC_014600.1	heldout	Raspberry latent virus segment S3, complete genome
+NC_014601.1	heldout	Raspberry latent virus segment S4, complete genome
+NC_014602.1	heldout	Raspberry latent virus segment S5, complete genome
+NC_014603.1	heldout	Raspberry latent virus segment S6, complete genome
+NC_014604.1	heldout	Raspberry latent virus segment S7, complete genome
+NC_014605.1	heldout	Raspberry latent virus segment S8, complete genome
+NC_014606.1	heldout	Raspberry latent virus segment S9, complete genome
+NC_014607.1	heldout	Raspberry latent virus segment S10, complete genome
+NC_014511.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 1, complete genome
+NC_014512.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 2, complete genome
+NC_014513.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 3, complete genome
+NC_014514.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 4, complete genome
+NC_014515.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 5, complete genome
+NC_014516.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 6, complete genome
+NC_014517.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 7, complete genome
+NC_014518.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 8, complete genome
+NC_014519.1	train	Rotavirus D chicken/05V0049/DEU/2005 segment 9, complete genome
+NC_014236.1	train	Broome virus segment L1, complete genome
+NC_014237.1	train	Broome virus segment L2, complete genome
+NC_014238.1	train	Broome virus segment L3, complete genome
+NC_014239.1	train	Broome virus segment M1, complete genome
+NC_014240.1	train	Broome virus segment M2, complete genome
+NC_014241.1	train	Broome virus segment M3, complete genome
+NC_014242.1	train	Broome virus segment S1, complete genome
+NC_014243.1	train	Broome virus segment S2, complete genome
+NC_014244.1	train	Broome virus segment S3, complete genome
+NC_013234.1	train	Mammalian orthoreovirus 3 segment S4, complete genome
+NC_013233.1	train	Mammalian orthoreovirus 3 segment S3, complete genome
+NC_013232.1	train	Mammalian orthoreovirus 3 segment S2, complete genome
+NC_013231.1	train	Mammalian orthoreovirus 3 segment S1, complete genome
+NC_027026.1	heldout	Sapovirus Hu/Nagoya/NGY-1/2012/JPN genomic RNA, complete genome
+NC_075724.1	heldout	Sapovirus Hu/GI/Sapporo/MT-2010/1982, complete genome
+NC_075569.1	train	Feline calicivirus, complete genome
+NC_075411.1	train	Calicivirus chicken/V0021/Bayern/2004, complete genome
+NC_004064.1	train	Nebraska virus, complete genome
+NC_000940.1	train	Cowden I virus, complete genome
+NC_044856.1	train	Norovirus GI strain Hu/BD/2011/GI.7[PNA2]/Dhaka1882, complete genome
+NC_044855.1	train	Norovirus GIV strain Hu/US/2016/GIV.NA1[PNA1]/WI7002, complete genome
+NC_044854.1	train	Norovirus GI strain Hu/JP/2000/GI.6[PNA1]/WUG1, complete genome
+NC_044853.1	train	Norovirus GI strain Hu/JP/1998/GI.6[PNA4]/No20-Saitama-98-17, complete genome
+NC_040674.1	train	Marmot norovirus strain HT16, complete genome
+NC_040876.1	train	Norovirus GII.P7_GII.6, complete genome
+NC_039477.1	train	Norovirus GII, complete genome
+NC_039475.1	train	Norovirus GII.17, complete genome
+NC_044046.1	train	Norovirus GII/Hu/JP/2011/GII/Yuzawa/Gira2HS, complete genome
+NC_044045.1	train	Norovirus GII/Hu/JP/2007/GII.P15_GII.15/Sapporo/HK299, complete genome
+NC_039897.1	train	Norovirus GI/Hu/JP/2007/GI.P3_GI.3/Shimizu/KK2866, complete genome
+NC_031324.1	train	Primate norovirus, complete genome
+NC_039476.1	train	Norovirus GII.2 strain Env/CHN/2016/GII.P16-GII.2/BJSMQ, complete genome
+NC_034444.1	train	Hom-1 vesivirus, complete genome
+NC_033081.1	train	Chicken calicivirus strain RS/BR/2015, complete genome
+NC_030793.1	heldout	Bovine calicivirus strain Kirklareli, complete genome
+NC_027122.1	train	Vesivirus ferret badger/JX12/China/2012, complete genome
+NC_025676.1	heldout	San Miguel sea lion virus 8, complete genome
+NC_024078.1	train	Goose calicivirus strain N, complete genome
+NC_024031.1	train	Atlantic salmon calicivirus isolate Nordland/2011, complete genome
+NC_019712.1	heldout	Mink calicivirus, complete genome
+NC_017936.1	train	Bat sapovirus TLC58/HK, complete genome
+NC_012699.1	train	Calicivirus pig/AB90/CAN, complete genome
+NC_011704.1	train	Rabbit calicivirus Australia 1 MIC-07, complete genome
+NC_011050.1	train	Steller sea lion vesivirus, complete genome
+NC_008580.1	train	Rabbit vesivirus, complete genome
+NC_008311.1	train	Norovirus GV, complete genome
+NC_001959.2	train	Norovirus GI, complete genome
+NC_007916.1	train	Newbury agent 1 virus, complete genome
+NC_006875.1	train	Calicivirus isolate TCG, complete genome
+NC_006269.1	heldout	Sapovirus Hu/Dresden/pJG-Sap01/DE, complete genome
+NC_010624.1	heldout	Sapovirus Mc10, complete genome
+NC_001481.2	train	Feline calicivirus, complete genome
+NC_004542.1	heldout	Canine calicivirus, complete genome
+NC_002615.1	train	European brown hare syndrome virus, complete genome
+NC_002551.1	train	Vesicular exanthema of swine virus, complete genome
+NC_001543.1	train	Rabbit hemorrhagic disease virus-FRG, complete genome
+NC_001526.4	heldout	Human papillomavirus type 16, complete genome
+NC_014955.1	heldout	Human papillomavirus type 132, complete genome
+NC_075251.1	heldout	Human papillomavirus type 38, complete genome
+NC_075235.1	heldout	Human papillomavirus type 11 (HPV-11) complete genome
+NC_075233.1	heldout	Human papillomavirus type 33, complete genome
+NC_075191.1	heldout	Human papillomavirus type 31 (HPV-31) complete genome
+NC_006563.1	train	Trichechus manatus latirostris papillomavirus 1, complete genome
+NC_001524.1	heldout	Alces alces papillomavirus 1, complete genome
+NC_003973.1	heldout	Psittacus erithacus timneh papillomavirus, complete genome
+NC_002232.1	heldout	Oryctolagus cuniculus papillomavirus 1, complete genome
+NC_040827.1	heldout	Macaca mulatta papillomavirus 3 isolate PM084S3c177403, complete genome
+NC_040818.1	train	Leptonychotes weddellii papillomavirus 6 isolate 17495, complete genome
+NC_040806.1	train	Gammapapillomavirus sp. isolate Gamma_w27c03a, complete genome
+NC_040805.1	train	Gammapapillomavirus sp. isolate GammaiCH2_EV03c434, complete genome
+NC_040804.1	train	Gammapapillomavirus sp. isolate Gamma_w27c157c, complete genome
+NC_040803.1	train	Gammapapillomavirus sp. isolate Gamma_w23c08c, complete genome
+NC_040787.1	heldout	Molossus molossus papillomavirus 1 isolate MmoPV1_MF, complete genome
+NC_040785.1	train	Rusa timorensis papillomavirus type 2 isolate IZW 39/08, complete genome
+NC_040728.1	heldout	Macaca mulatta papillomavirus 7, complete genome
+NC_040727.1	heldout	Macaca mulatta papillomavirus 6, complete genome
+NC_040709.1	heldout	Macaca mulatta papillomavirus 2 isolate PM069S3c168082, complete genome
+NC_040691.1	train	Gammapapillomavirus sp. isolate Gammai915_ga2c70, complete genome
+NC_040688.1	train	Gammapapillomavirus sp. isolate Gamma_w11C51, complete genome
+NC_040655.1	heldout	Macaca mulatta papillomavirus 5, complete genome
+NC_040640.1	heldout	Human papillomavirus type 203 isolate SE369, complete genome
+NC_040620.1	train	Gammapapillomavirus sp. isolate GammaDyskD_w07c34d, complete genome
+NC_040619.1	train	Gammapapillomavirus sp. isolate Gamma_LCOSOc196, complete genome
+NC_040604.1	train	Rodent papillomavirus isolate RtRn-PV/GD2014, complete genome
+NC_040583.1	heldout	Boa constrictor papillomavirus 1 isolate CH_2018_UZH, complete genome
+NC_040580.1	train	Erethizon dorsatum papillomavirus 2 isolate AZ-SWCC-2016, complete genome
+NC_040579.1	heldout	Canine papillomavirus 22 strain Mas_P6, complete genome
+NC_040578.1	heldout	Canine papillomavirus 21 strain Lab_P1, complete genome
+NC_040569.1	heldout	Macaca mulatta papillomavirus 4 isolate PM084S3c176982, complete genome
+NC_040550.1	train	Gammapapillomavirus sp. isolate Gamma_w34c04a, complete genome
+NC_040548.1	train	Serinus canaria papillomavirus 1 strain York1, complete genome
+NC_014952.1	heldout	Human papillomavirus type 128, complete genome
+NC_014953.1	heldout	Human papillomavirus type 129, complete genome
+NC_014954.1	heldout	Human papillomavirus type 131, complete genome
+NC_014956.1	heldout	Human papillomavirus type 134, complete genome
+NC_012213.1	heldout	Human papillomavirus type 108, complete genome
+NC_034616.1	heldout	Human papillomavirus type 85 isolate 114B, complete genome
+NC_039089.1	heldout	Human papillomavirus type 71 DNA, complete genome
+NC_039086.1	heldout	Human papillomavirus type 187 isolate ACS447, complete genome
+NC_039042.1	train	Cervus elaphus papillomavirus type 2, complete genome
+NC_039041.1	train	Rusa timorensis papillomavirus type 1 isolate IZW 39/08, complete genome
+NC_039040.1	train	Myotis ricketti papillomavirus 1, complete genome
+NC_039039.1	heldout	Peromyscus papillomavirus type 1 strain M-14 PmPV1, complete genome
+NC_039038.1	train	Talpa europaea papillomavirus isolate Bruges/2009/22, complete genome
+NC_039037.1	heldout	Pudu puda papillomavirus type 1, complete genome
+NC_039036.1	train	Giraffa camelopardalis papillomavirus 1 isolate GC2011, complete genome
+NC_038914.1	heldout	Human papillomavirus type 184 complete genome, isolate SIBX17
+NC_038531.1	train	Vulpes vulpes papillomavirus 1 isolate ILAT 93957, complete genome
+NC_038527.1	heldout	Rhinolophus ferrumequinum papillomavirus type 1, complete genome
+NC_038526.1	train	Trichechus manatus papillomavirus 3 strain TmPV-3, complete genome
+NC_038525.1	heldout	Human papillomavirus type 204 isolate A342, complete genome
+NC_038524.1	heldout	Human papillomavirus type 175 isolate SE87, complete genome
+NC_038523.1	heldout	Human papillomavirus type 172, complete genome
+NC_038522.1	heldout	Human papillomavirus type 161 isolate KC1, complete genome
+NC_038520.1	train	Feline papillomavirus type 2 isolate Main Coon 2007, complete genome
+NC_038519.1	heldout	Miniopterus schreibersii papillomavirus 1 strain TT20F, complete genome
+NC_038518.1	train	Eptesicus serotinus papillomavirus type 1, complete genome
+NC_038517.1	train	Eptesicus serotinus papillomavirus type 2, complete genome
+NC_038516.1	train	Ovine papillomavirus type 3 isolate Sar1, complete genome
+NC_037069.1	train	Leptonychotes weddellii papillomavirus 3 isolate 17181, complete genome
+NC_037067.1	train	Leptonychotes weddellii papillomavirus 2 isolate 11445, complete genome
+NC_037064.1	train	Leptonychotes weddellii papillomavirus 4 isolate 12091, complete genome
+NC_037061.1	train	Leptonychotes weddellii papillomavirus 1 isolate 13241, complete genome
+NC_037059.1	train	Leptonychotes weddellii papillomavirus 5 isolate 12975, complete genome
+NC_035478.1	train	Sus scrofa papillomavirus 2 isolate DE1018-16, complete genome
+NC_035479.1	train	Felis catus papillomavirus type 5, complete genome
+NC_035208.1	heldout	Bovine papillomavirus isolate NY-8385, complete genome
+NC_035201.1	heldout	Ailuropoda melanoleuca papillomavirus 1 strain gpam001, complete genome
+NC_035199.1	heldout	Ailuropoda melanoleuca papillomavirus 2 strain gpam002, complete genome
+NC_035193.1	heldout	Ailuropoda melanoleuca papillomavirus 4 strain gpam004, complete genome
+NC_033781.1	heldout	Human papillomavirus type 156 isolate GC01, complete genome
+NC_033745.1	train	Eidolon helvum papillomavirus 3, complete genome
+NC_033740.1	train	Eidolon helvum papillomavirus 2, complete genome
+NC_031756.1	heldout	Equus caballus papillomavirus 8 strain NCSU, complete genome
+NC_030839.1	train	Sparus aurata papillomavirus 1, complete genome
+NC_030801.1	train	Bos taurus papillomavirus 21, complete genome
+NC_030800.1	train	Bos taurus papillomavirus 20, complete genome
+NC_030799.1	train	Bos taurus papillomavirus 19, complete genome
+NC_030798.1	train	Bos taurus papillomavirus 18, complete genome
+NC_030797.1	train	Bos taurus papillomavirus 17, complete genome
+NC_030796.1	train	Bos taurus papillomavirus 16, complete genome
+NC_030795.1	train	Bos taurus papillomavirus 13 strain 14RO12, complete genome
+NC_030151.1	train	Cervus papillomavirus 2 isolate BernieDPV, complete genome
+NC_028492.1	train	Rattus norvegicus papillomavirus 3 isolate Rat_60S, complete genome
+NC_028267.1	train	Trichechus manatus papillomavirus 4 strain TmPV-4, complete genome
+NC_028126.1	heldout	Bovine papillomavirus type 12 isolate PR000001, complete genome
+NC_028125.1	heldout	Human papillomavirus type 163 isolate KC3, complete genome
+NC_027779.1	heldout	Human papillomavirus isolate SE379, complete genome
+NC_027528.1	heldout	Human papillomavirus type 201 isolate HPV201, complete genome
+NC_026946.1	heldout	Human papillomavirus KC5, complete genome
+NC_026640.1	heldout	Canine papillomavirus 16 isolate Chana, complete genome
+NC_024893.1	train	Apodemus sylvaticus papillomavirus 1, complete genome
+NC_024300.1	train	Fulmarus glacialis papillomavirus 1, complete genome
+NC_023895.1	train	Rupicapra rupicapra papillomavirus 1, complete genome
+NC_023894.1	train	Pygoscelis adeliae papillomavirus isolate Crozier_2013, complete genome
+NC_023891.1	heldout	Human papillomavirus type 178, complete genome
+NC_138290.1	train	MAG: Dermacentor reticulatus rhabdovirus 1 isolate CT3, complete genome
+NC_083851.1	train	TPA: Bird's-foot trefoil nucleorhabdovirus isolate LC, complete genome
+NC_077193.1	train	MAG: Artemisia capillaris nucleorhabovirus 1 isolate YK, complete genome
+NC_077173.1	train	Wufeng Myotis altarium vesiculovirus 1 isolate WFB_YunShu, complete genome
+NC_077172.1	train	Wenzhou Myotis laniger tupavirus 1 isolate YJB_HuaNan, complete genome
+NC_077171.1	train	Wenzhou Rhinolophus pusillus ledantevirus 1 isolate YJB_DanJiao, complete genome
+NC_077164.1	train	Aksy-Durug Melophagus sigmavirus strain 13577, complete genome
+NC_077153.1	heldout	Porcine ephemerovirus 1 isolate HeN10, complete genome
+NC_077151.1	train	Cnidium virus 1 isolate SK, complete genome
+NC_077149.1	train	MAG: Apis rhabdovirus 3 isolate Sichuan/2019, complete genome
+NC_077130.1	train	Longquan Niviventer coninga ledantevirus 1, complete genome
+NC_077129.1	train	Wufeng Rhinolophus pearsonii tupavirus 1, complete genome
+NC_077123.1	train	MAG: Hangzhou frankliniella intonsa rhabdovirus 1 isolate JM1FY86115, complete genome
+NC_077105.1	heldout	Actinidia cytorhabdovirus JS27, complete genome
+NC_077047.1	train	Kenyan potato cytorhabdovirus isolate 18-1062, complete genome
+NC_076939.1	heldout	Mediterranean bat virus isolate A09181, complete genome
+NC_076914.1	heldout	Chrysanthemum yellow dwarf virus isolate cq, complete genome
+NC_076913.1	heldout	Joa yellow blotch virus isolate Manaus, complete genome
+NC_076909.1	heldout	Rose virus R isolate MDR92016, complete genome
+NC_076898.1	train	Cucurbit cytorhabdovirus 1 isolate ND4, complete genome
+NC_076864.1	train	Paper mulberry mosaic-associated virus isolate SWU, complete genome
+NC_076842.1	train	Yinshui bat virus isolate 1017, complete genome
+NC_076841.1	train	Taiyi bat virus isolate 958, complete genome
+NC_076534.1	train	Anole lyssa-like virus 1 A.allogus/Cuba/2011 RNA, complete genome
+NC_076532.1	train	Bacopa monnieri virus 2 isolate India, complete genome
+NC_076531.1	train	Bacopa monnieri virus 1 isolate India, complete genome
+NC_076472.1	train	Yerba mate virus A isolate Gob. Virasoro, complete genome
+NC_076448.1	heldout	Peach virus 1 isolate NSTT, complete genome
+NC_076430.1	heldout	Cardamom vein clearing nucleorhabdovirus 1, complete genome
+NC_076415.1	train	Blanchseco virus isolate TTP-Pool-17, complete genome
+NC_076244.1	heldout	Green Sichuan pepper nucleorhabdovirus isolate ZPNu1, complete genome
+NC_076938.1	train	Matariya virus isolate 09027EGY, complete genome
+NC_076937.1	train	Burg el Arab virus isolate 09023EGY, complete genome
+NC_076936.1	heldout	Ouango virus isolate 9718RCA, complete genome
+NC_076935.1	train	Kolongo virus isolate 9717RCA, complete genome
+NC_076934.1	heldout	Bimbo virus isolate 9716RCA, complete genome
+NC_076933.1	train	Nasoule virus isolate 0410RCA, complete genome
+NC_076932.1	train	Sandjimba virus isolate 0408RCA, complete genome
+NC_076931.1	train	Boteke virus isolate 0417RCA, complete genome
+NC_076867.1	heldout	Perhabdovirus perca isolate 18/193, complete genome
+NC_076720.1	heldout	Harbour porpoise rhabdovirus isolate WVL17017A, complete genome
+NC_076686.1	heldout	Frog lyssa-like virus 1 strain FLLV1-MaleA, complete genome
+NC_076510.1	train	Sowthistle yellow vein virus isolate HWY65, complete genome
+NC_076504.1	heldout	Rhabdoviridae sp. strain RhV/SZWH3, complete genome
+NC_076267.1	train	Apple rootstock virus A, complete genome
+NC_076261.1	train	Hayes Yard virus isolate DPP4816, complete genome
+NC_076260.1	train	Puchong virus isolate P5-350 Malaysian, complete genome
+NC_076239.1	train	Cytorhabdovirus fragariarugosus isolate A, complete genome
+NC_076211.1	train	Dillard's Draw virus isolate DDrV-2015, complete genome
+NC_076210.1	train	Chimay rhabdovirus isolate Chimay-1, complete genome
+NC_076208.1	train	New Kent County virus isolate RTS126, complete genome
+NC_076201.1	train	Blacklegged tick rhabdovirus-1 isolate RTS95.16, complete genome
+NC_076186.1	heldout	Rhabdoviridae sp. strain IH17, complete genome
+NC_076163.1	train	Potato yellow dwarf nucleorhabdovirus strain CYDV-constricta, complete genome
+NC_076024.1	train	Alfalfa associated nucleorhabdovirus, complete genome
+NC_076000.1	train	Black currant nucleorhabdovirus 1 isolate Veloy, complete genome
+NC_075997.1	heldout	Maize associated rhabdovirus strain Peru, complete genome
+NC_075304.1	train	Culex rhabdo-like virus strain CRVL/Los Angeles, complete genome
+NC_006942.1	train	Taro vein chlorosis virus, complete genome
+NC_039200.1	train	Balsa almendravirus, complete genome
+NC_055567.1	train	Strawberry cytorhabdovirus 1 isolate B, complete genome
+NC_055529.1	heldout	Raspberry vein chlorosis virus isolate Hutton_1, complete genome
+NC_055505.1	train	Yerba mate chlorosis-associated virus isolate Montecarlo, complete genome
+NC_055504.1	train	Papaya cytorhabdovirus isolate Los Rios_Ec, complete genome
+NC_055479.1	train	Cabbage cytorhabdovirus 1 strain FERA_050726, complete genome
+NC_055477.1	heldout	Ohlsdorf virus strain Germany/2012/Oc.cantans, complete genome
+NC_055474.1	train	Taiwan bat lyssavirus isolate TWBLV/TN/2016, complete genome
+NC_055473.1	train	Holmes Jungle virus isolate DPP1163, complete genome
+NC_055466.1	train	Physostegia chlorotic mottle virus isolate PV-1182, complete genome
+NC_055454.1	heldout	Maize yellow striate virus, complete genome
+NC_035132.1	train	Culex rhabdo-like virus strain mosWSB71420, complete genome
+NC_028484.1	heldout	Tongilchon virus 1 strain A12.2676/ROK/2012, complete genome
+NC_028234.1	train	Santa barbara virus strain AR775619, complete genome
+NC_040786.1	train	Rice stripe mosaic virus isolate GD-LD, complete genome
+NC_040669.1	train	Riverside virus 1 strain RISV-Drava 1, complete genome
+NC_040664.1	train	Zahedan rhabdovirus isolate Ar Teh 157764, complete genome
+NC_040602.1	train	Menghai rhabdovirus isolate Menghai, complete genome
+NC_040599.1	train	Merida virus isolate MERD-Mex07, complete genome
+NC_040532.1	heldout	Merida-like virus KE-2017a isolate 139-1-21, complete genome
+NC_028237.2	train	Alfalfa dwarf virus isolate Manfredi, complete genome
+NC_034551.1	heldout	Colocasia bobone disease-associated virus strain SI, complete genome
+NC_030451.1	train	Diachasmimorpha longicaudata rhabdovirus isolate UGA, complete genome
+NC_039021.1	train	Beatrice Hill virus isolate CSIRO 25, complete genome
+NC_038286.1	train	Piry virus strain BeAn2423, complete genome
+NC_038281.1	train	Drosophila melanogaster sigma virus HAP23, complete genome
+NC_038236.1	train	Vesicular stomatitis Indiana virus strain 98COE, complete genome
+NC_036390.1	heldout	Maize Iranian mosaic nucleorhabdovirus, complete genome
+NC_001615.3	heldout	Sonchus yellow net virus complete genome
+NC_034240.1	heldout	Tomato yellow mottle-associated virus, complete genome
+NC_031988.1	heldout	Gannoruwa bat lyssavirus isolate RV3266, complete genome
+NC_031955.1	train	Lleida bat lyssavirus isolate RV3208, complete genome
+NC_028255.1	heldout	Cocal virus Indiana 2, complete genome
+NC_028246.1	train	Adelaide River virus isolate DPP61, complete genome
+NC_028244.1	train	Barley yellow striate mosaic virus strain Hebei, complete genome
+NC_028241.1	train	Yata virus isolate DakArB 2181, complete genome
+NC_028239.1	train	Koolpinyah virus isolate DPP819, complete genome
+NC_028236.1	heldout	Kumasi rhabdbovirus, complete genome
+NC_028232.1	train	Walkabout Creek virus isolate CS1056, complete genome
+NC_028231.1	heldout	Datura yellow vein virus, complete genome
+NC_028230.1	train	Inhangapi virus strain BEAR177325, complete genome
