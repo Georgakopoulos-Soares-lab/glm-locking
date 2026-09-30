@@ -105,6 +105,33 @@ CKPTS = {
     "svd_k3_a30k":  "checkpoints/ft_theorem8_a30k_k3_25k_locked.pt",
     "svd_k2_a30k":  "checkpoints/ft_theorem8_a30k_k2_25k_locked.pt",
     "svd_k5_a30k":  "checkpoints/ft_theorem8_a30k_k5_25k_locked.pt",
+    "ft_lora_a10k": "checkpoints/ft_lora_a10k_25k_locked.pt",
+    "lora_specdef_a10k": "checkpoints/ft_lora_on_specdef_a10k_25k_locked.pt",
+    "lora_a30k": "checkpoints/ft_lora_a30k_25k_locked.pt",
+    "lora_specdef_a30k": "checkpoints/ft_lora_on_specdef_a30k_25k_locked.pt",
+    # ---- best-val-loss checkpoints -------------------------------------------
+    # The entries above resolve to model_finetuned.pt (final, step 25000). Every
+    # 25k run peaked EARLIER (steps 10700-23200), and results/attack_heldout_ppl.csv
+    # reports PPL from model_best.pt -- so the published PPL and capability columns
+    # come from different weights of the same run. These entries pin model_best.pt
+    # so both are read off one checkpoint, and so the attacker gets the checkpoint
+    # they would actually keep.
+    "unlocked_ft_best":       "results/ft_unlocked_full910_25k_unlocked/model_best.pt",
+    # matched ceiling: trained on attack_train.fasta (544), like every locked arm.
+    # "unlocked_ft" above trained on all 910 (819 train), an uncontrolled advantage.
+    "unlocked_544_best":      "results/ft_unlocked_25k_v2_unlocked/model_best.pt",
+    "M_a300k_best":           "results/ft_locked_a300k_lr1e5_25k_locked/model_best.pt",
+    "svd_k2_a30k_best":       "results/ft_theorem8_a30k_k2_25k_locked/model_best.pt",
+    "svd_k3_a30k_best":       "results/ft_theorem8_a30k_k3_25k_locked/model_best.pt",
+    # Reference arms, re-run inside the same batch so the whole table is
+    # self-consistent (every significance bracket in the paper is "vs pretrained",
+    # and at seed 0 the published pretrained row exists for LR 1e-04 only, while
+    # some attacked arms have all three). Neither is fine-tuned, so they have no
+    # best/final distinction -- these are aliases of the originals. The alias
+    # names matter: preds_key is f"{task}_{ckpt_name}_{lr}", so reusing the bare
+    # names would overwrite the published .npz prediction files.
+    "pretrained_ref":         None,
+    "locked_no_ft_ref":       "checkpoints/lock_alpha300k.pt",
 }
 
 

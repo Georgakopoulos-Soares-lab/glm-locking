@@ -383,6 +383,18 @@ def _run_finetune(cfg: FinetuneConfig, rank: int = 0, local_rank: int = 0, world
         # Override target set: only LoRA params train; everything else frozen.
         target_names_set = set(lora_names)
 
+        # Optional: also wrap SpecDefLinear layers with additive LoRA
+        if getattr(cfg, "lora_on_specdef", False):
+            from src.lora import inject_lora_on_specdef
+            n_specdef = inject_lora_on_specdef(model, rank=cfg.lora_rank, alpha=cfg.lora_alpha)
+            # Collect the new LoRAOnSpecDef params
+            specdef_lora_names = [n for n, p in model.named_parameters()
+                                  if 'lora_' in n and p.requires_grad]
+            target_names_set.update(specdef_lora_names)
+            if is_main:
+                print(f"[LoRA-on-SpecDef] Wrapped {n_specdef} SpecDefLinear layers "
+                      f"({len(specdef_lora_names)} new LoRA params)")
+
     frozen_count, trainable_count = freeze_all_except(model, target_names_set)
 
     # Spectral monitoring: track the 7 locked linear-layer patterns specifically

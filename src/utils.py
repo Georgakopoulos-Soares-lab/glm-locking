@@ -130,6 +130,7 @@ class FinetuneConfig:
     lora_rank: int = 16
     lora_alpha: float = 32.0
     lora_target_substrings: tuple = (".linear",)  # match SpecDef-wrapped Linear by default
+    lora_on_specdef: bool = False  # additionally wrap SpecDefLinear with LoRAOnSpecDef
     # If True (default), cast frozen C matrices to bfloat16 after freeze_comp.
     # WARNING: for runs that keep raw SpecDefLinear (no bypass/theorem8 injection),
     # this causes catastrophic error in specdef_fused_eval because:

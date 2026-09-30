@@ -1,7 +1,7 @@
 """
 Build all 4 figures for the revised manuscript.
 Run: python scripts/build_paper_figures.py
-Output: paper/fig1_lora_bars.png, fig2_main_bars.png, fig3_kablation.png, figS1_probing_vs_lora.png
+Output: paper/fig1_lora_bars.png, fig2_main_bars.png, fig3_kablation.png, figS2_probing_vs_lora.png
 """
 import numpy as np, os, re
 import matplotlib
@@ -252,7 +252,7 @@ print("  → paper/fig3_kablation.png/pdf")
 # =============================================================================
 # FIGURE S1: Probing vs LoRA FT — pretrained, unlocked, M
 # =============================================================================
-print("Building figS1_probing_vs_lora...")
+print("Building figS2_probing_vs_lora...")
 
 # Probing data from hvue_probe.csv
 probing = {
@@ -319,9 +319,9 @@ p2 = Patch(facecolor='#4C72B0', alpha=1.0, label='LoRA FT (full config.)')
 kmer_ln = Line2D([0],[0], color='#777777', lw=1.1, ls='--', label='$k$-mer baseline')
 figS1.legend(handles=[p1, p2, kmer_ln], loc='upper center', ncol=3, fontsize=9, frameon=False, bbox_to_anchor=(0.5, 0.98))
 # figS1.suptitle removed — caption in LaTeX
-figS1.savefig('paper/figS1_probing_vs_lora.png', bbox_inches='tight', dpi=150)
-figS1.savefig('paper/figS1_probing_vs_lora.pdf', bbox_inches='tight', dpi=150)
+figS1.savefig('paper/figS2_probing_vs_lora.png', bbox_inches='tight', dpi=150)
+figS1.savefig('paper/figS2_probing_vs_lora.pdf', bbox_inches='tight', dpi=150)
 plt.close(figS1)
-print("  → paper/figS1_probing_vs_lora.png/pdf")
+print("  → paper/figS2_probing_vs_lora.png/pdf")
 
 print("\nAll 4 figures built. Output in paper/")
